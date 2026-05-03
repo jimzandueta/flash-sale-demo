@@ -3,6 +3,7 @@ export type ReservationAttempt = {
   userToken: string;
   ttlSeconds: number;
   now: string;
+  idempotencyKey?: string;
 };
 
 export type ReservationResult =
@@ -11,6 +12,7 @@ export type ReservationResult =
       reservationId: string;
       expiresAt: string;
       remainingStock: number;
+      shouldPublishEvent?: boolean;
     }
   | { status: 'ALREADY_RESERVED' }
   | { status: 'SOLD_OUT' };

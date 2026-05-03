@@ -10,19 +10,24 @@ export async function reserveSale(
     userToken: string;
     ttlSeconds: number;
     now: string;
-    idempotencyKey: string;
+    idempotencyKey?: string;
   }
 ) {
   const result = await engine.reserve(input);
 
-  if (result.status === 'RESERVED') {
+  if (result.status === 'RESERVED' && result.shouldPublishEvent !== false) {
     await publishEvent('reservation-created', {
-      eventId: input.idempotencyKey,
+      eventId: input.idempotencyKey ?? result.reservationId,
       reservationId: result.reservationId,
       saleId: input.saleId,
       userToken: input.userToken,
       expiresAt: result.expiresAt
     });
+  }
+
+  if (result.status === 'RESERVED') {
+    const { shouldPublishEvent: _shouldPublishEvent, ...response } = result;
+    return response;
   }
 
   return result;
