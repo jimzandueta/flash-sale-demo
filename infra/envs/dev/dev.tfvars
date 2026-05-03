@@ -1,0 +1,15 @@
+aws_region                      = "us-east-1"
+project_name                    = "flash-sale-platform"
+environment                     = "dev"
+default_reservation_ttl_seconds = 300
+vpc_id                          = "vpc-0123456789abcdef0"
+lambda_subnet_ids               = ["subnet-0123456789abcdef0", "subnet-1234567890abcdef0"]
+lambda_security_group_ids       = ["sg-0123456789abcdef0"]
+elasticache_subnet_ids          = ["subnet-0123456789abcdef0", "subnet-1234567890abcdef0"]
+elasticache_security_group_ids  = ["sg-1234567890abcdef0"]
+session_api_zip_path            = "../../../.build/session-api.zip"
+sales_api_zip_path              = "../../../.build/sales-api.zip"
+reservation_api_zip_path        = "../../../.build/reservation-api.zip"
+checkout_api_zip_path           = "../../../.build/checkout-api.zip"
+reservation_worker_zip_path     = "../../../.build/reservation-worker.zip"
+expiry_sweeper_zip_path         = "../../../.build/expiry-sweeper.zip"
