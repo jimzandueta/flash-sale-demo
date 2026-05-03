@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
-import { reserveSale } from '../../reservation-api/src/handler';
+import { checkoutReservation } from '../../checkout-api/src/handler';
+import { getReservationById, listReservationsForUser, reserveSale } from '../../reservation-api/src/handler';
 import { listSales } from '../../sales-api/src/handler';
 import { createSession } from '../../session-api/src/handler';
 import { createRedisClient } from '../../shared/src/redisClient';
@@ -57,6 +58,36 @@ export async function buildServer() {
     logger.debug('reservation spike result', result);
 
     return result;
+  });
+
+  app.post('/reservations/:reservationId/checkout', async (request) => {
+    const params = request.params as { reservationId: string };
+    const headers = request.headers as { 'x-user-token'?: string };
+    const body = (request.body ?? {}) as { simulateFailure?: boolean };
+
+    return checkoutReservation({
+      reservationId: params.reservationId,
+      userToken: headers['x-user-token'] ?? 'missing',
+      simulateFailure: body.simulateFailure ?? false
+    });
+  });
+
+  app.get('/reservations', async (request) => {
+    const headers = request.headers as { 'x-user-token'?: string };
+
+    return listReservationsForUser(redis, headers['x-user-token'] ?? 'missing');
+  });
+
+  app.get('/reservations/:reservationId', async (request, reply) => {
+    const params = request.params as { reservationId: string };
+    const headers = request.headers as { 'x-user-token'?: string };
+    const reservation = await getReservationById(redis, params.reservationId);
+
+    if (!reservation || reservation.userToken !== (headers['x-user-token'] ?? 'missing')) {
+      return reply.code(404).send({ status: 'RESERVATION_NOT_FOUND' });
+    }
+
+    return reservation;
   });
 
   return app;
