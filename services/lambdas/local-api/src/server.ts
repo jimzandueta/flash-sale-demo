@@ -50,7 +50,8 @@ export async function buildServer() {
       saleId: params.saleId,
       userToken: headers['x-user-token'] ?? 'missing',
       ttlSeconds: 300,
-      now: new Date().toISOString()
+      now: new Date().toISOString(),
+      idempotencyKey: String(headers['idempotency-key'] ?? 'missing')
     });
 
     logger.debug('reservation spike result', result);
