@@ -1,0 +1,9 @@
+[
+  {
+    "reservationId": "res_local_001",
+    "saleId": "sale_sneaker_001",
+    "userToken": "usr_tok_seed_1",
+    "status": "RESERVED",
+    "expiresAt": "2026-05-06T10:05:00Z"
+  }
+]

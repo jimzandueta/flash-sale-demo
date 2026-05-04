@@ -1,0 +1,38 @@
+[
+  {
+    "saleId": "sale_sneaker_001",
+    "itemName": "Limited Sneaker",
+    "status": "active",
+    "startsAt": "2026-05-06T10:00:00Z",
+    "endsAt": "2026-05-06T12:00:00Z",
+    "initialStock": 10,
+    "reservationTtlSeconds": 300
+  },
+  {
+    "saleId": "sale_jacket_002",
+    "itemName": "Track Jacket",
+    "status": "active",
+    "startsAt": "2026-05-06T10:15:00Z",
+    "endsAt": "2026-05-06T12:30:00Z",
+    "initialStock": 5,
+    "reservationTtlSeconds": 300
+  },
+  {
+    "saleId": "sale_cap_003",
+    "itemName": "Collector Cap",
+    "status": "upcoming",
+    "startsAt": "2026-05-06T13:00:00Z",
+    "endsAt": "2026-05-06T14:00:00Z",
+    "initialStock": 20,
+    "reservationTtlSeconds": 300
+  },
+  {
+    "saleId": "sale_watch_004",
+    "itemName": "Retro Watch",
+    "status": "ended",
+    "startsAt": "2026-05-06T07:30:00Z",
+    "endsAt": "2026-05-06T08:30:00Z",
+    "initialStock": 3,
+    "reservationTtlSeconds": 300
+  }
+]
