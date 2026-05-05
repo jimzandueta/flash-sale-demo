@@ -275,8 +275,8 @@ const purchasedBanner: CSSProperties = {
   margin: 0,
   padding: '0.55rem 0.75rem',
   borderRadius: '0.6rem',
-  background: '#e0f0ff',
-  color: '#095ae9',
+  background: '#dcfce7',
+  color: '#166534',
   fontSize: '0.8rem'
 };
 

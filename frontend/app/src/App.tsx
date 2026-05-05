@@ -210,7 +210,7 @@ export default function App() {
         setCart(nextCart);
         setReservations((current) => current.filter((reservation) => reservation.reservationId !== reservationId));
 
-        if (page === 'checkout' && nextCart.length === 0 && purchases.length === 0) {
+        if (page === 'checkout' && nextCart.length === 0) {
           navigate('/products');
         }
         return;

@@ -81,7 +81,7 @@ export function CheckoutPage({
             </div>
 
             {isUrgent ? (
-              <p style={urgentWarning}>Less than 1 minute - this hold will expire soon</p>
+              <p style={urgentWarning}>⚠ Less than 1 minute — this hold will expire soon</p>
             ) : null}
 
             <label style={simulateRow}>
