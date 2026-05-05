@@ -6,7 +6,7 @@ describe('reservation route guardrails', () => {
   let redis!: Redis;
 
   beforeEach(async () => {
-    process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+    process.env.REDIS_URL ??= 'redis://127.0.0.1:6379';
     redis = new Redis(process.env.REDIS_URL);
     await redis.flushdb();
   });
