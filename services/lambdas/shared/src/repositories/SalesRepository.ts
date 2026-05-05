@@ -1,41 +1,53 @@
 import { getAppConfig } from '../config';
 import type { SaleSummary } from '../types';
 
+function relativeIso(offsetMs: number): string {
+  return new Date(Date.now() + offsetMs).toISOString();
+}
+
+function deriveStatus(startsAt: string, endsAt: string): SaleSummary['status'] {
+  const now = Date.now();
+  if (now < Date.parse(startsAt)) return 'upcoming';
+  if (now > Date.parse(endsAt)) return 'ended';
+  return 'active';
+}
+
 export function listSeedSales(): SaleSummary[] {
   const ttl = getAppConfig().defaultReservationTtlSeconds;
 
-  return [
+  const seeds = [
     {
       saleId: 'sale_sneaker_001',
       itemName: 'Limited Sneaker',
-      status: 'active',
-      startsAt: '2026-05-06T10:00:00Z',
-      endsAt: '2026-05-06T12:00:00Z',
+      startsAt: relativeIso(-10 * 60 * 1000),
+      endsAt: relativeIso(50 * 60 * 1000),
       reservationTtlSeconds: ttl
     },
     {
       saleId: 'sale_jacket_002',
       itemName: 'Track Jacket',
-      status: 'active',
-      startsAt: '2026-05-06T10:15:00Z',
-      endsAt: '2026-05-06T12:30:00Z',
+      startsAt: relativeIso(-5 * 60 * 1000),
+      endsAt: relativeIso(25 * 60 * 1000),
       reservationTtlSeconds: ttl
     },
     {
       saleId: 'sale_cap_003',
       itemName: 'Collector Cap',
-      status: 'upcoming',
-      startsAt: '2026-05-06T13:00:00Z',
-      endsAt: '2026-05-06T14:00:00Z',
+      startsAt: relativeIso(60 * 60 * 1000),
+      endsAt: relativeIso(90 * 60 * 1000),
       reservationTtlSeconds: ttl
     },
     {
       saleId: 'sale_watch_004',
       itemName: 'Retro Watch',
-      status: 'ended',
-      startsAt: '2026-05-06T07:30:00Z',
-      endsAt: '2026-05-06T08:30:00Z',
+      startsAt: relativeIso(-120 * 60 * 1000),
+      endsAt: relativeIso(-60 * 60 * 1000),
       reservationTtlSeconds: ttl
     }
   ];
+
+  return seeds.map((s) => ({
+    ...s,
+    status: deriveStatus(s.startsAt, s.endsAt)
+  }));
 }

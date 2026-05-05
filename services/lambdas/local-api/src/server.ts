@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import { checkoutReservation } from '../../checkout-api/src/handler';
-import { getReservationById, listReservationsForUser, reserveSale } from '../../reservation-api/src/handler';
+import { cancelReservation, getReservationById, listReservationsForUser, reserveSale } from '../../reservation-api/src/handler';
 import { listSales } from '../../sales-api/src/handler';
 import { createSession } from '../../session-api/src/handler';
 import { createRedisClient } from '../../shared/src/redisClient';
@@ -131,6 +131,31 @@ export async function buildServer() {
     }
 
     return reservation;
+  });
+
+  app.delete('/reservations/:reservationId', async (request, reply) => {
+    const params = request.params as { reservationId: string };
+    const headers = request.headers as { 'x-user-token'?: string };
+    const userToken = getUserToken(headers);
+
+    if (!userToken) {
+      return reply.code(401).send({ status: 'USER_TOKEN_REQUIRED' });
+    }
+
+    const result = await cancelReservation(redis, {
+      reservationId: params.reservationId,
+      userToken
+    });
+
+    if (result.status === 'FORBIDDEN') {
+      return reply.code(403).send({ status: 'FORBIDDEN' });
+    }
+
+    if (result.status === 'NOT_FOUND') {
+      return reply.code(404).send({ status: 'NOT_FOUND' });
+    }
+
+    return result;
   });
 
   return app;

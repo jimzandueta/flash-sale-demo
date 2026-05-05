@@ -1,4 +1,5 @@
 import type Redis from 'ioredis';
+import { readFileSync } from 'node:fs';
 import { redisKeys } from '../../shared/src/redisKeys';
 import { publishEvent } from '../../shared/src/events/publishEvent';
 import type { ReservationEngine } from '../../shared/src/reservation/ReservationEngine';
@@ -60,5 +61,27 @@ export async function getReservationById(redis: Redis, reservationId: string) {
     userToken: payload.userToken,
     status: payload.status,
     expiresAt: new Date(Number(payload.expiresAt)).toISOString()
+  };
+}
+
+const cancelScript = readFileSync(
+  new URL('../../shared/src/reservation/cancelReservation.lua', import.meta.url),
+  'utf8'
+);
+
+export async function cancelReservation(
+  redis: Redis,
+  input: { reservationId: string; userToken: string }
+) {
+  const result = (await redis.eval(
+    cancelScript,
+    1,
+    `reservation:${input.reservationId}`,
+    input.userToken,
+    input.reservationId
+  )) as string[];
+
+  return {
+    status: result[0] as 'CANCELLED' | 'NOT_FOUND' | 'FORBIDDEN' | 'ALREADY_PURCHASED'
   };
 }
