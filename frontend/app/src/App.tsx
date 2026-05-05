@@ -33,6 +33,7 @@ export default function App() {
   const [isCheckingOutIds, setIsCheckingOutIds] = useState<Set<string>>(new Set());
   const [isCancellingIds, setIsCancellingIds] = useState<Set<string>>(new Set());
   const [simulateFailureIds, setSimulateFailureIds] = useState<Set<string>>(new Set());
+  const [checkoutErrors, setCheckoutErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<Notice | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const navigate = useNavigate();
@@ -78,9 +79,7 @@ export default function App() {
             ordered[0]?.saleId ??
             null
         );
-        setCart((current) =>
-          current.length > 0 ? current : deriveCartFromReservations(reservationPayload.items, ordered)
-        );
+        setCart(deriveCartFromReservations(reservationPayload.items, ordered));
       } catch {
         if (!cancelled) {
           setNotice({ tone: 'warning', text: 'Unable to load the live catalog right now.' });
@@ -99,6 +98,15 @@ export default function App() {
     };
   }, [session]);
 
+  async function refreshReservations(activeSales = sales) {
+    if (!session) return [];
+
+    const refreshed = await listReservations(session.userToken);
+    setReservations(refreshed.items);
+    setCart(deriveCartFromReservations(refreshed.items, activeSales));
+    return refreshed.items;
+  }
+
   async function handleCreateSession() {
     const displayName = draftDisplayName.trim();
     if (!displayName) return;
@@ -116,6 +124,7 @@ export default function App() {
       setPurchases([]);
       setPurchasedSaleIds(new Set());
       setSimulateFailureIds(new Set());
+      setCheckoutErrors({});
       navigate('/products');
     } catch {
       setNotice({ tone: 'warning', text: 'Unable to create a session right now.' });
@@ -166,6 +175,7 @@ export default function App() {
 
       if (result.status === 'ALREADY_RESERVED') {
         const existing = reservations.find((reservation) => reservation.saleId === selectedSale.saleId);
+
         if (existing) {
           setCart((current) => [
             ...current.filter((item) => item.saleId !== selectedSale.saleId),
@@ -178,7 +188,14 @@ export default function App() {
           ]);
           setNotice({ tone: 'neutral', text: 'You already have an active hold for this product.' });
         } else {
-          setNotice({ tone: 'warning', text: 'This product already has an active hold for this session.' });
+          const refreshed = await refreshReservations();
+          const recovered = refreshed.find((reservation) => reservation.saleId === selectedSale.saleId);
+
+          if (recovered) {
+            setNotice({ tone: 'neutral', text: 'You already have an active hold for this product.' });
+          } else {
+            setNotice({ tone: 'warning', text: 'This product already has an active hold for this session.' });
+          }
         }
         return;
       }
@@ -209,6 +226,11 @@ export default function App() {
         const nextCart = cart.filter((item) => item.reservationId !== reservationId);
         setCart(nextCart);
         setReservations((current) => current.filter((reservation) => reservation.reservationId !== reservationId));
+        setCheckoutErrors((current) => {
+          const next = { ...current };
+          delete next[reservationId];
+          return next;
+        });
 
         if (page === 'checkout' && nextCart.length === 0) {
           navigate('/products');
@@ -218,9 +240,7 @@ export default function App() {
 
       if (result.status === 'ALREADY_PURCHASED') {
         setNotice({ tone: 'warning', text: 'That item has already been purchased.' });
-        const refreshed = await listReservations(session.userToken);
-        setReservations(refreshed.items);
-        setCart(deriveCartFromReservations(refreshed.items, sales));
+        await refreshReservations();
         return;
       }
 
@@ -243,6 +263,11 @@ export default function App() {
 
     setIsCheckingOutIds((current) => new Set([...current, reservationId]));
     setNotice(null);
+    setCheckoutErrors((current) => {
+      const next = { ...current };
+      delete next[reservationId];
+      return next;
+    });
 
     try {
       const result = await checkoutReservationRequest(
@@ -253,7 +278,19 @@ export default function App() {
       );
 
       if (result.status === 'PAYMENT_FAILED') {
-        setNotice({ tone: 'warning', text: `Payment failed for ${cartItem.itemName}. Your hold remains active.` });
+        setCheckoutErrors((current) => ({
+          ...current,
+          [reservationId]: `Payment failed for ${cartItem.itemName}. Your hold remains active.`
+        }));
+        return;
+      }
+
+      if (result.status === 'RESERVATION_EXPIRED') {
+        await refreshReservations();
+        setNotice({
+          tone: 'warning',
+          text: `${cartItem.itemName} expired before checkout. The cart has been refreshed.`
+        });
         return;
       }
 
@@ -265,7 +302,8 @@ export default function App() {
           reservationId,
           saleId: cartItem.saleId,
           itemName: cartItem.itemName,
-          purchasedAt: result.purchasedAt
+          purchasedAt: result.purchasedAt,
+          expiresAt: cartItem.expiresAt
         }
       ]);
       setPurchasedSaleIds((current) => new Set([...current, cartItem.saleId]));
@@ -370,6 +408,7 @@ export default function App() {
         notice={notice}
         cart={cart}
         purchases={purchases}
+        checkoutErrors={checkoutErrors}
         now={now}
         isCheckingOutIds={isCheckingOutIds}
         isCancellingIds={isCancellingIds}

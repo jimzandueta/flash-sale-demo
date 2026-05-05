@@ -54,4 +54,31 @@ describe('reservation status endpoints', () => {
 
     await app.close();
   });
+
+  it('filters expired reservations out of GET /reservations and returns stock once', async () => {
+    const app = await buildServer();
+
+    const reserveResponse = await app.inject({
+      method: 'POST',
+      url: '/sales/sale_sneaker_001/reservations',
+      headers: { 'x-user-token': 'usr_tok_1', 'idempotency-key': 'status_expired_1' }
+    });
+    const reservationId = reserveResponse.json().reservationId as string;
+    const expiredAtMs = Date.now() - 1_000;
+
+    await redis.hset(`reservation:${reservationId}`, 'expiresAt', String(expiredAtMs));
+    await redis.zadd('sale:sale_sneaker_001:expiries', expiredAtMs, reservationId);
+
+    const listResponse = await app.inject({
+      method: 'GET',
+      url: '/reservations',
+      headers: { 'x-user-token': 'usr_tok_1' }
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json().items).toEqual([]);
+    expect(await redis.get('sale:sale_sneaker_001:stock')).toBe('10');
+
+    await app.close();
+  });
 });

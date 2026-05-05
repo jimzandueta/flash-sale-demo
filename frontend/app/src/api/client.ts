@@ -45,6 +45,10 @@ export type CheckoutResponse =
   | {
       status: 'PAYMENT_FAILED';
       reservationId: string;
+    }
+  | {
+      status: 'RESERVATION_EXPIRED';
+      reservationId: string;
     };
 
 export type CancelReservationResponse =

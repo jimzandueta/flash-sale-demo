@@ -5,7 +5,7 @@ import { flow, pageLabels, type Notice, type Page } from '../types';
 type Props = {
   page: Page;
   title: string;
-  description: string;
+  description?: string;
   session: SessionResponse | null;
   notice: Notice | null;
   children: ReactNode;
@@ -21,7 +21,7 @@ export function PageShell({ page, title, description, session, notice, children,
             <p style={brandMark}>Bookipi / Flash Sale</p>
             <p style={pageKicker}>{pageLabels[page]}</p>
             <h1 style={pageTitle}>{title}</h1>
-            <p style={pageDescription}>{description}</p>
+            {description ? <p style={pageDescription}>{description}</p> : null}
           </div>
 
           <div style={mastheadSide}>
@@ -54,9 +54,10 @@ export function PageShell({ page, title, description, session, notice, children,
 }
 
 function stepChip(step: Page, currentPage: Page): CSSProperties {
-  const currentIndex = flow.indexOf(currentPage);
+  const effectivePage = currentPage === 'product-page' ? 'product-list' : currentPage;
+  const currentIndex = flow.indexOf(effectivePage);
   const stepIndex = flow.indexOf(step);
-  const isActive = step === currentPage;
+  const isActive = step === effectivePage;
   const isComplete = stepIndex < currentIndex;
 
   return {
@@ -121,10 +122,11 @@ const frame: CSSProperties = {
 };
 
 const masthead: CSSProperties = {
-  display: 'grid',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
   gap: '0.75rem',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-  alignItems: 'start'
+  flexWrap: 'wrap'
 };
 
 const mastheadSide: CSSProperties = { display: 'grid', gap: '0.75rem' };

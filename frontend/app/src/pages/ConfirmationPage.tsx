@@ -14,8 +14,7 @@ export function ConfirmationPage({ session, notice, purchases, onBack }: Props) 
   return (
     <PageShell
       page="confirmation"
-      title="Order Confirmation"
-      description="Your order is complete. Purchased items are marked on the product list."
+      title="Order confirmed"
       session={session}
       notice={notice}
     >

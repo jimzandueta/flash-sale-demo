@@ -2,6 +2,7 @@ import type Redis from 'ioredis';
 import { readFileSync } from 'node:fs';
 import { redisKeys } from '../../shared/src/redisKeys';
 import { publishEvent } from '../../shared/src/events/publishEvent';
+import { reconcileExpiredReservation } from '../../shared/src/reservation/releaseExpiredReservations';
 import type { ReservationEngine } from '../../shared/src/reservation/ReservationEngine';
 
 export async function reserveSale(
@@ -36,15 +37,28 @@ export async function reserveSale(
 
 export async function listReservationsForUser(redis: Redis, userToken: string) {
   const reservationIds = await redis.smembers(redisKeys.userReservations(userToken));
-  const reservations = await Promise.all(
-    reservationIds.map((reservationId) => getReservationById(redis, reservationId))
-  );
+  const nowIso = new Date().toISOString();
+  const reservations = [] as NonNullable<Awaited<ReturnType<typeof getReservationById>>>[];
+
+  for (const reservationId of reservationIds) {
+    const reservation = await getReservationById(redis, reservationId);
+
+    if (!reservation) {
+      continue;
+    }
+
+    if (reservation.status === 'RESERVED' && Date.parse(reservation.expiresAt) <= Date.parse(nowIso)) {
+      await reconcileExpiredReservation(redis, reservation.saleId, reservationId, nowIso);
+      continue;
+    }
+
+    if (reservation.status === 'RESERVED') {
+      reservations.push(reservation);
+    }
+  }
 
   return {
-    items: reservations.filter(
-      (reservation): reservation is NonNullable<typeof reservation> =>
-        Boolean(reservation && reservation.status === 'RESERVED')
-    )
+    items: reservations
   };
 }
 

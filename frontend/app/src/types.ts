@@ -23,20 +23,20 @@ export type PurchaseSummary = {
   saleId: string;
   itemName: string;
   purchasedAt: string;
+  expiresAt: string;
 };
 
 export const flow: Page[] = [
   'landing',
   'product-list',
-  'product-page',
   'checkout',
   'confirmation'
 ];
 
 export const pageLabels: Record<Page, string> = {
   landing: 'Landing',
-  'product-list': 'Product List',
+  'product-list': 'Products',
   'product-page': 'Product Page',
   checkout: 'Checkout',
-  confirmation: 'Order Confirmation'
+  confirmation: 'Confirm'
 };

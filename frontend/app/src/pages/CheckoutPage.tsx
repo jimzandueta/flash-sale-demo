@@ -8,6 +8,7 @@ type Props = {
   notice: Notice | null;
   cart: CartReservation[];
   purchases: PurchaseSummary[];
+  checkoutErrors: Record<string, string>;
   now: number;
   isCheckingOutIds: Set<string>;
   isCancellingIds: Set<string>;
@@ -24,6 +25,7 @@ export function CheckoutPage({
   notice,
   cart,
   purchases,
+  checkoutErrors,
   now,
   isCheckingOutIds,
   isCancellingIds,
@@ -34,42 +36,49 @@ export function CheckoutPage({
   onViewConfirmation,
   onKeepShopping
 }: Props) {
-  const sortedCart = [...cart].sort((a, b) => Date.parse(a.expiresAt) - Date.parse(b.expiresAt));
+  const rows = [
+    ...purchases.map((purchase) => ({ kind: 'purchase' as const, sortAt: purchase.expiresAt, purchase })),
+    ...cart.map((item) => ({ kind: 'cart' as const, sortAt: item.expiresAt, item }))
+  ].sort((a, b) => Date.parse(a.sortAt) - Date.parse(b.sortAt));
   const allDone = cart.length === 0 && purchases.length > 0;
 
   return (
     <PageShell
       page="checkout"
-      title="Checkout"
-      description="Pay for each held item. The most urgent hold is shown first."
+      title="Review your cart"
       session={session}
       notice={notice}
     >
-      {purchases.map((purchase) => (
-        <div key={purchase.reservationId} style={purchasedCard}>
-          <p style={eyebrowSuccess}>✓ Purchased</p>
-          <div style={purchasedRow}>
-            <span style={checkBadge}>✓</span>
-            <div>
-              <p style={itemName}>{purchase.itemName}</p>
-              <p style={itemMeta}>Paid at {formatDateTime(purchase.purchasedAt)}</p>
-              <p style={reservationIdText}>{purchase.reservationId}</p>
+      {rows.map((row, index) => {
+        if (row.kind === 'purchase') {
+          return (
+            <div key={row.purchase.reservationId} style={purchasedCard}>
+              <p style={eyebrowSuccess}>✓ Purchased</p>
+              <div style={purchasedRow}>
+                <span style={checkBadge}>✓</span>
+                <div>
+                  <p style={itemName}>{row.purchase.itemName}</p>
+                  <p style={itemMeta}>Paid at {formatDateTime(row.purchase.purchasedAt)}</p>
+                  <p style={reservationIdText}>{row.purchase.reservationId}</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      ))}
+          );
+        }
 
-      {sortedCart.map((item, index) => {
+        const item = row.item;
         const msRemaining = Date.parse(item.expiresAt) - now;
         const isUrgent = msRemaining > 0 && msRemaining < 60_000;
         const isBuying = isCheckingOutIds.has(item.reservationId);
         const isCancelling = isCancellingIds.has(item.reservationId);
         const simFailure = simulateFailureIds.has(item.reservationId);
+        const error = checkoutErrors[item.reservationId];
+        const activeIndex = rows.slice(0, index).filter((entry) => entry.kind === 'cart').length;
 
         return (
           <div key={item.reservationId} style={isUrgent ? urgentCard : normalCard}>
             <p style={isUrgent ? eyebrowUrgent : eyebrow}>
-              {isUrgent ? '⚡ Expires soonest — pay this first' : index === 0 ? 'Pay next' : 'Up next'}
+              {isUrgent ? '⚡ Expires soonest — pay this first' : activeIndex === 0 ? 'Pay next' : 'Up next'}
             </p>
             <p style={cardTitle}>{item.itemName}</p>
 
@@ -93,6 +102,8 @@ export function CheckoutPage({
               />
               Simulate payment failure
             </label>
+
+            {error ? <p style={itemError}>{error}</p> : null}
 
             <button
               style={isUrgent ? buyUrgentBtn : buyNormalBtn}
@@ -259,6 +270,16 @@ const simulateRow: CSSProperties = {
   fontSize: '0.78rem',
   color: '#6b7280',
   marginBottom: '0.6rem'
+};
+
+const itemError: CSSProperties = {
+  margin: '0 0 0.6rem',
+  padding: '0.45rem 0.65rem',
+  borderRadius: '0.5rem',
+  background: 'rgba(192,57,43,0.08)',
+  border: '1px solid rgba(192,57,43,0.2)',
+  color: '#c0392b',
+  fontSize: '0.78rem'
 };
 
 const buyNormalBtn: CSSProperties = {

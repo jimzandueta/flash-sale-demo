@@ -29,8 +29,7 @@ export function ProductListPage({
   return (
     <PageShell
       page="product-list"
-      title="Product List"
-      description="Browse active drops, hold items, and proceed to checkout when you're ready."
+      title="Available drops"
       session={session}
       notice={notice}
     >
@@ -205,8 +204,8 @@ const purchasedBanner: CSSProperties = {
   margin: 0,
   padding: '0.3rem 0.55rem',
   borderRadius: '0.4rem',
-  background: '#dcfce7',
-  color: '#166534',
+  background: '#e0f0ff',
+  color: '#095ae9',
   fontSize: '0.75rem'
 };
 

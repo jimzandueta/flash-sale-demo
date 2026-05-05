@@ -98,7 +98,7 @@ export async function buildServer() {
       return reply.code(401).send({ status: 'USER_TOKEN_REQUIRED' });
     }
 
-    return checkoutReservation({
+    return checkoutReservation(redis, {
       reservationId: params.reservationId,
       userToken,
       simulateFailure: body.simulateFailure ?? false

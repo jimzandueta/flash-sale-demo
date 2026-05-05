@@ -1,6 +1,6 @@
 # Flash Sale Platform
 
-Flash Sale Platform is a thin React storefront backed by Fastify handlers, Redis reservation state, DynamoDB persistence hooks, and queue-driven reconciliation workers. The local flow mirrors the intended product journey: landing, product list, product page, checkout, payment confirmation, and final order confirmation.
+Flash Sale Platform is a thin React storefront backed by Fastify handlers, Redis reservation state, DynamoDB persistence hooks, and queue-driven reconciliation workers. The local flow mirrors the implemented product journey: landing, product list, product page, checkout with inline purchase receipts, and final order confirmation.
 
 ## Run locally
 

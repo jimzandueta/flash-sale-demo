@@ -1,38 +1,58 @@
+import type Redis from 'ioredis';
+import { readFileSync } from 'node:fs';
 import { publishEvent } from '../../shared/src/events/publishEvent';
-import { logger } from '../../shared/src/logger';
+import { redisKeys } from '../../shared/src/redisKeys';
 
-export async function checkoutReservation(input: {
-  reservationId: string;
-  userToken: string;
-  simulateFailure: boolean;
-}) {
-  logger.debug('checkout input', input);
+const checkoutScript = readFileSync(
+  new URL('../../shared/src/reservation/checkoutReservation.lua', import.meta.url),
+  'utf8'
+);
 
-  if (input.simulateFailure) {
-    await publishEvent('payment-failed', {
-      reservationId: input.reservationId,
-      userToken: input.userToken,
-      status: 'PAYMENT_FAILED'
-    });
+export async function checkoutReservation(
+  redis: Pick<Redis, 'eval'>,
+  input: {
+    reservationId: string;
+    userToken: string;
+    simulateFailure: boolean;
+    now?: string;
+  }
+) {
+  const nowIso = input.now ?? new Date().toISOString();
+  const result = (await redis.eval(
+    checkoutScript,
+    1,
+    redisKeys.reservation(input.reservationId),
+    input.userToken,
+    input.reservationId,
+    String(Date.parse(nowIso)),
+    nowIso,
+    input.simulateFailure ? '1' : '0'
+  )) as string[];
 
+  if (result[0] === 'PAYMENT_FAILED') {
     return {
       status: 'PAYMENT_FAILED',
       reservationId: input.reservationId
     };
   }
 
-  const purchasedAt = new Date().toISOString();
+  if (result[0] === 'RESERVATION_EXPIRED') {
+    return {
+      status: 'RESERVATION_EXPIRED',
+      reservationId: input.reservationId
+    };
+  }
 
   await publishEvent('purchase-completed', {
     reservationId: input.reservationId,
     userToken: input.userToken,
     status: 'PURCHASED',
-    purchasedAt
+    purchasedAt: result[1]
   });
 
   return {
     status: 'PURCHASED',
     reservationId: input.reservationId,
-    purchasedAt
+    purchasedAt: result[1]
   };
 }
