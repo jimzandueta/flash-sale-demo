@@ -69,7 +69,7 @@ export function CheckoutPage({
         return (
           <div key={item.reservationId} style={isUrgent ? urgentCard : normalCard}>
             <p style={isUrgent ? eyebrowUrgent : eyebrow}>
-              {isUrgent ? 'Expires soonest - pay this first' : index === 0 ? 'Pay next' : 'Up next'}
+              {isUrgent ? '⚡ Expires soonest — pay this first' : index === 0 ? 'Pay next' : 'Up next'}
             </p>
             <p style={cardTitle}>{item.itemName}</p>
 
@@ -150,8 +150,7 @@ const purchasedCard: CSSProperties = {
   background: '#f0fdf4',
   border: '1px solid #bbf7d0',
   borderRadius: '0.875rem',
-  padding: '1rem',
-  marginBottom: '0.7rem'
+  padding: '1rem'
 };
 
 const eyebrowSuccess: CSSProperties = {
@@ -187,8 +186,7 @@ const normalCard: CSSProperties = {
   border: '1px solid #e5e7eb',
   borderRadius: '0.875rem',
   padding: '1rem',
-  boxShadow: '0 1px 6px rgba(9,90,233,0.06)',
-  marginBottom: '0.7rem'
+  boxShadow: '0 1px 6px rgba(9,90,233,0.06)'
 };
 
 const urgentCard: CSSProperties = {
@@ -196,8 +194,7 @@ const urgentCard: CSSProperties = {
   border: '2px solid #c0392b',
   borderRadius: '0.875rem',
   padding: '1rem',
-  boxShadow: '0 4px 18px rgba(192,57,43,0.15)',
-  marginBottom: '0.7rem'
+  boxShadow: '0 4px 18px rgba(192,57,43,0.15)'
 };
 
 const eyebrow: CSSProperties = {
@@ -303,8 +300,7 @@ const allDoneCard: CSSProperties = {
   background: '#f0fdf4',
   border: '1px solid #bbf7d0',
   borderRadius: '0.875rem',
-  padding: '1rem',
-  marginBottom: '0.7rem'
+  padding: '1rem'
 };
 
 const confirmationBtn: CSSProperties = {

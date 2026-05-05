@@ -36,7 +36,7 @@ export function ProductListPage({
     >
       {cart.length > 0 ? (
         <div style={cartBar}>
-          <span style={cartBarText}>{cart.length} {cart.length === 1 ? 'item' : 'items'} held</span>
+          <span style={cartBarText}>🛒 {cart.length} {cart.length === 1 ? 'item' : 'items'} held</span>
           <button style={cartBarBtn} onClick={onProceedToCheckout}>
             Proceed to checkout →
           </button>

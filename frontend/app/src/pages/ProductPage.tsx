@@ -40,8 +40,8 @@ export function ProductPage({
   return (
     <PageShell
       page="product-page"
-      title="Product Page"
-      description="Reserve your hold before the window closes."
+      title={selectedSale.itemName}
+      description={formatWindow(selectedSale.startsAt, selectedSale.endsAt)}
       session={session}
       notice={notice}
     >

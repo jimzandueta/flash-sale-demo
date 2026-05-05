@@ -73,7 +73,7 @@ describe('App', () => {
     const productListHeading = screen.getByRole('heading', { name: 'Product List' });
     expect(productListHeading.style.fontSize).toBe('clamp(1.15rem, 2.3vw, 1.5rem)');
 
-    const cartBar = screen.getByText('1 item held').parentElement;
+    const cartBar = screen.getByText('🛒 1 item held').parentElement;
     expect(cartBar?.style.borderRadius).toBe('0.6rem');
   });
 
@@ -153,7 +153,7 @@ describe('App', () => {
     expect(screen.getByText('Limited Sneaker')).toBeDefined();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'View product' })[0]);
-    expect(await screen.findByRole('heading', { name: 'Product Page' })).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'Limited Sneaker', level: 1 })).toBeDefined();
     expect(window.location.pathname).toBe('/products/sale_sneaker_001');
 
     fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
@@ -162,10 +162,10 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '← Keep shopping' }));
     expect(await screen.findByRole('heading', { name: 'Product List' })).toBeDefined();
-    expect(screen.getByText('1 item held')).toBeDefined();
+    expect(screen.getByText('🛒 1 item held')).toBeDefined();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'View product' })[1]);
-    expect(await screen.findByText('Track Jacket')).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'Track Jacket', level: 1 })).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Add to cart' }));
     expect(await screen.findByText('This item is held in your cart')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Proceed to checkout →' }));
