@@ -47,6 +47,10 @@ export type CheckoutResponse =
       reservationId: string;
     };
 
+export type CancelReservationResponse =
+  | { status: 'CANCELLED' }
+  | { status: 'NOT_FOUND' | 'FORBIDDEN' | 'ALREADY_PURCHASED' };
+
 async function readJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
@@ -100,4 +104,13 @@ export async function checkoutReservationRequest(
   });
 
   return readJson<CheckoutResponse>(response);
+}
+
+export async function cancelReservation(reservationId: string, userToken: string) {
+  const response = await fetch(`/reservations/${reservationId}`, {
+    method: 'DELETE',
+    headers: { 'x-user-token': userToken }
+  });
+
+  return readJson<CancelReservationResponse>(response);
 }
