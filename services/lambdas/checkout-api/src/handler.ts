@@ -1,11 +1,12 @@
 import { publishEvent } from '../../shared/src/events/publishEvent';
+import { logger } from '../../shared/src/logger';
 
 export async function checkoutReservation(input: {
   reservationId: string;
   userToken: string;
   simulateFailure: boolean;
 }) {
-  console.log('[checkout] input', input);
+  logger.debug('checkout input', input);
 
   if (input.simulateFailure) {
     await publishEvent('payment-failed', {

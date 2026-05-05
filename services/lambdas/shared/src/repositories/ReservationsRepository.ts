@@ -1,4 +1,5 @@
 import { createDynamoClient } from '../dynamoClient';
+import { logger } from '../logger';
 
 export async function putReservationRecord(event: {
   reservationId: string;
@@ -8,7 +9,7 @@ export async function putReservationRecord(event: {
 }) {
   const dynamo = createDynamoClient();
 
-  console.log('[ReservationsRepository] put', event, dynamo);
+  logger.debug('ReservationsRepository put', event, dynamo);
 
   return { ok: true };
 }

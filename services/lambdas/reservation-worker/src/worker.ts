@@ -1,3 +1,4 @@
+import { logger } from '../../shared/src/logger';
 import { putReservationRecord } from '../../shared/src/repositories/ReservationsRepository';
 
 export async function handleReservationCreated(event: {
@@ -7,7 +8,7 @@ export async function handleReservationCreated(event: {
   userToken: string;
   expiresAt: string;
 }) {
-  console.log('[reservation-worker] persisting', event);
+  logger.debug('reservation-worker persisting', event);
 
   await putReservationRecord(event);
 
