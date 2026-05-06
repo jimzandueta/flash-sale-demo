@@ -28,10 +28,20 @@ export type ReservationExpiredEvent = {
   expiresAt: string;
 };
 
+export type ReservationCancelledEvent = {
+  eventType: 'reservation-cancelled';
+  eventId: string;
+  occurredAt: string;
+  reservationId: string;
+  saleId: string;
+  userToken: string;
+};
+
 export type DurableEvent =
   | ReservationCreatedEvent
   | PurchaseCompletedEvent
-  | ReservationExpiredEvent;
+  | ReservationExpiredEvent
+  | ReservationCancelledEvent;
 
 export type DurableEventType = DurableEvent['eventType'];
 
@@ -39,6 +49,7 @@ export type DurableEventPayloadByType = {
   'reservation-created': Omit<ReservationCreatedEvent, 'eventType'>;
   'purchase-completed': Omit<PurchaseCompletedEvent, 'eventType'>;
   'reservation-expired': Omit<ReservationExpiredEvent, 'eventType'>;
+  'reservation-cancelled': Omit<ReservationCancelledEvent, 'eventType'>;
 };
 
 function readString(payload: Record<string, unknown>, field: string) {
@@ -74,6 +85,8 @@ export function queueUrlForEventType(
 ) {
   switch (eventType) {
     case 'reservation-created':
+      return config.reservationEventsQueueUrl;
+    case 'reservation-cancelled':
       return config.reservationEventsQueueUrl;
     case 'purchase-completed':
       return config.purchaseEventsQueueUrl;
@@ -136,6 +149,20 @@ export function buildDurableEvent<T extends DurableEventType>(
         userToken: requireString(runtimePayload, 'userToken', eventType),
         expiresAt: requireString(runtimePayload, 'expiresAt', eventType)
       } satisfies ReservationExpiredEvent;
+
+      return event as Extract<DurableEvent, { eventType: T }>;
+    }
+    case 'reservation-cancelled': {
+      const event = {
+        eventType,
+        eventId:
+          readString(runtimePayload, 'eventId') ??
+          `reservation-cancelled:${requireString(runtimePayload, 'reservationId', eventType)}`,
+        occurredAt: readString(runtimePayload, 'occurredAt') ?? new Date().toISOString(),
+        reservationId: requireString(runtimePayload, 'reservationId', eventType),
+        saleId: readString(runtimePayload, 'saleId') ?? unknownSaleId(),
+        userToken: requireString(runtimePayload, 'userToken', eventType)
+      } satisfies ReservationCancelledEvent;
 
       return event as Extract<DurableEvent, { eventType: T }>;
     }

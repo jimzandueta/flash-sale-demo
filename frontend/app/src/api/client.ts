@@ -7,6 +7,7 @@ export type SaleItem = {
   saleId: string;
   itemName: string;
   price?: number;
+  remainingStock?: number;
   status: 'upcoming' | 'active' | 'ended';
   startsAt: string;
   endsAt: string;

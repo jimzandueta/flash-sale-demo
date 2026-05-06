@@ -5,6 +5,7 @@ import { redisKeys } from '../redisKeys';
 import type { ReservationAttempt, ReservationEngine, ReservationResult } from './ReservationEngine';
 
 const reserveStockScript = readFileSync(new URL('./reserveStock.lua', import.meta.url), 'utf8');
+const reservationReconciliationGraceSeconds = 60;
 
 export class RedisReservationEngine implements ReservationEngine {
   constructor(private readonly redis: Redis) {}
@@ -28,7 +29,8 @@ export class RedisReservationEngine implements ReservationEngine {
       input.ttlSeconds,
       input.saleId,
       input.userToken,
-      idempotencyEnabled ? '1' : '0'
+      idempotencyEnabled ? '1' : '0',
+      reservationReconciliationGraceSeconds
     )) as string[];
 
     if (result[0] === 'ALREADY_RESERVED') {

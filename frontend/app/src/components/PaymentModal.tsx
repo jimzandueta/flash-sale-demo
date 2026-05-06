@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { formatUsd, storefrontPrice } from '../storefrontPricing';
+import { formatRemaining } from '../dateUtils';
 import type { CartReservation } from '../types';
 
 type Props = {
@@ -27,54 +28,83 @@ export function PaymentModal({
 }: Props) {
   const price = storefrontPrice(item.itemName, item.price);
 
+  const msRemaining = Date.parse(item.expiresAt) - now;
+  const isUrgent = msRemaining > 0 && msRemaining < 60_000;
+
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="payment-modal-title" style={backdrop}>
       <div style={modal}>
-        <div style={headerRow}>
-          <h2 id="payment-modal-title" style={title}>
-            {`Pay for ${item.itemName}`}
-          </h2>
-          <span style={timer}>{formatRemaining(item.expiresAt, now)}</span>
-        </div>
-
-        <div style={summaryCard}>
-          <p style={summaryName}>{item.itemName}</p>
-          <p style={summaryMeta}>Reservation {item.reservationId}</p>
-          <p style={summaryPrice}>{price === null ? 'Price unavailable' : formatUsd(price)}</p>
-        </div>
-
-        <div style={fieldGrid}>
-          <div style={fieldCard}>
-            <span style={fieldLabel}>Card number</span>
-            <strong style={fieldValue}>**** **** **** 4242</strong>
+        <div style={modalHead}>
+          <div>
+            <p style={modalEyebrow}>Payment</p>
+            <h2 id="payment-modal-title" style={modalTitle}>
+              Pay for {item.itemName}
+            </h2>
           </div>
-          <div style={fieldCard}>
+          <span style={isUrgent ? timerPillUrgent : timerPill}>
+            {formatRemaining(item.expiresAt, now)} left
+          </span>
+        </div>
+
+        <div style={itemReview}>
+          <div style={inlineRow}>
+            <strong style={itemNameStyle}>{item.itemName}</strong>
+            <span style={itemPriceStyle}>{price === null ? 'Price unavailable' : formatUsd(price)}</span>
+          </div>
+          <div style={inlineRow}>
+            <span style={saleWindowPill}>{item.saleId}</span>
+            <span style={mutedText}>Reservation `{item.reservationId}`</span>
+          </div>
+        </div>
+
+        <div style={formGrid}>
+          <div style={field}>
+            <div style={fieldHead}>
+              <span style={fieldLabel}>Cardholder name</span>
+              <span style={mutedText}>Prefilled</span>
+            </div>
+            <span style={fieldValue}>{shopperName}</span>
+          </div>
+          <div style={field}>
+            <div style={fieldHead}>
+              <span style={fieldLabel}>Card number</span>
+              <span style={mutedText}>Read only</span>
+            </div>
+            <span style={fieldValue}>**** **** **** 4242</span>
+          </div>
+          <div style={field}>
             <span style={fieldLabel}>Expiry</span>
-            <strong style={fieldValue}>08/29</strong>
+            <span style={fieldValue}>12/30</span>
           </div>
-          <div style={fieldCard}>
+          <div style={field}>
             <span style={fieldLabel}>CVV</span>
-            <strong style={fieldValue}>****</strong>
-          </div>
-          <div style={fieldCard}>
-            <span style={fieldLabel}>Name</span>
-            <strong style={fieldValue}>{shopperName}</strong>
+            <span style={fieldValue}>****</span>
           </div>
         </div>
 
-        <label style={toggleRow}>
-          <input
-            type="checkbox"
-            checked={isSimulatingFailure}
-            onChange={onToggleSimulateFailure}
-            disabled={isSubmitting}
-          />
-          Simulate payment failure
-        </label>
+        <div style={testingBox}>
+          <div style={inlineRow}>
+            <span style={testingPill}>Payment testing</span>
+            <span style={mutedText}>Optional</span>
+          </div>
+          <div style={toggleRow}>
+            <div style={toggleCopy}>
+              <span style={toggleLabel}>Simulate payment failure</span>
+              <span style={toggleHelp}>Use this only when checking failure handling.</span>
+            </div>
+            <button
+              style={isSimulatingFailure ? switchToggle : switchStyle}
+              onClick={!isSubmitting ? onToggleSimulateFailure : undefined}
+              disabled={isSubmitting}
+              aria-pressed={isSimulatingFailure}
+              type="button"
+            />
+          </div>
+        </div>
 
         {error ? <p style={errorText}>{error}</p> : null}
 
-        <div style={actions}>
+        <div style={modalActions}>
           <button style={cancelButton} disabled={isSubmitting} onClick={onCancel}>
             Cancel
           </button>
@@ -87,138 +117,267 @@ export function PaymentModal({
   );
 }
 
-function formatRemaining(expiresAt: string, now: number) {
-  const ms = Date.parse(expiresAt) - now;
-  if (ms <= 0) return '0:00';
-  const seconds = Math.floor(ms / 1000);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-}
-
 const backdrop: CSSProperties = {
   position: 'fixed',
   inset: 0,
   display: 'grid',
   placeItems: 'center',
-  padding: '1rem',
-  background: 'rgba(11,25,45,0.45)',
+  background: 'rgba(15,23,42,.32)',
+  padding: '24px',
   zIndex: 20
 };
 
 const modal: CSSProperties = {
-  width: 'min(100%, 32rem)',
+  width: 'min(100%, 640px)',
   display: 'grid',
-  gap: '0.9rem',
-  padding: '1rem',
-  borderRadius: '1rem',
+  gap: '16px',
+  padding: '22px',
+  borderRadius: '24px',
   background: '#ffffff',
-  border: '1px solid rgba(9,90,233,0.12)',
-  boxShadow: '0 24px 48px rgba(11,25,45,0.22)'
+  border: '1px solid rgba(95,111,255,.18)',
+  boxShadow: '0 24px 80px rgba(15,23,42,.22)'
 };
 
-const headerRow: CSSProperties = {
+const modalHead: CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
   justifyContent: 'space-between',
-  gap: '0.75rem'
+  alignItems: 'flex-start',
+  gap: '16px'
 };
 
-const title: CSSProperties = {
+const modalEyebrow: CSSProperties = {
   margin: 0,
-  fontSize: '1.2rem',
+  fontSize: '11px',
   fontWeight: 700,
-  color: '#0b192d'
+  letterSpacing: '.14em',
+  textTransform: 'uppercase',
+  color: '#5f6fff'
 };
 
-const timer: CSSProperties = {
-  padding: '0.28rem 0.7rem',
+const modalTitle: CSSProperties = {
+  margin: '4px 0 0',
+  fontSize: '28px',
+  color: '#101828'
+};
+
+const timerPill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '28px',
+  padding: '0 12px',
   borderRadius: '999px',
-  background: '#e0f0ff',
-  color: '#095ae9',
-  fontSize: '0.82rem',
-  fontWeight: 700
+  background: '#eef2ff',
+  color: '#4f46e5',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase'
 };
 
-const summaryCard: CSSProperties = {
-  display: 'grid',
-  gap: '0.25rem',
-  padding: '0.85rem',
-  borderRadius: '0.85rem',
-  background: '#f8fbff',
-  border: '1px solid rgba(9,90,233,0.1)'
+const timerPillUrgent: CSSProperties = {
+  ...timerPill,
+  background: '#d32f2f',
+  color: '#fff'
 };
 
-const summaryName: CSSProperties = { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0b192d' };
-const summaryMeta: CSSProperties = { margin: 0, fontSize: '0.78rem', color: '#6b7280' };
-const summaryPrice: CSSProperties = { margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#095ae9' };
-
-const fieldGrid: CSSProperties = {
+const itemReview: CSSProperties = {
   display: 'grid',
-  gap: '0.65rem',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))'
+  gap: '8px',
+  padding: '16px',
+  borderRadius: '18px',
+  background: '#f8faff',
+  border: '1px solid rgba(95,111,255,.10)'
 };
 
-const fieldCard: CSSProperties = {
+const inlineRow: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '12px',
+  flexWrap: 'wrap'
+};
+
+const itemNameStyle: CSSProperties = {
+  fontSize: '20px',
+  fontWeight: 700,
+  color: '#101828'
+};
+
+const itemPriceStyle: CSSProperties = {
+  fontSize: '22px',
+  fontWeight: 800,
+  color: '#101828',
+  textAlign: 'right',
+  whiteSpace: 'nowrap'
+};
+
+const saleWindowPill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '28px',
+  padding: '0 12px',
+  borderRadius: '999px',
+  background: '#f8fafc',
+  color: '#475467',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  border: '1px solid rgba(15,23,42,.08)'
+};
+
+const mutedText: CSSProperties = {
+  fontSize: '12px',
+  color: '#667085'
+};
+
+const formGrid: CSSProperties = {
   display: 'grid',
-  gap: '0.2rem',
-  padding: '0.75rem',
-  borderRadius: '0.75rem',
-  background: '#f9fafb',
-  border: '1px solid #e5e7eb'
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: '12px'
+};
+
+const field: CSSProperties = {
+  display: 'grid',
+  gap: '8px',
+  padding: '14px',
+  borderRadius: '16px',
+  background: '#fff',
+  border: '1px solid rgba(15,23,42,.08)'
+};
+
+const fieldHead: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '8px'
 };
 
 const fieldLabel: CSSProperties = {
-  fontSize: '0.72rem',
-  letterSpacing: '0.08em',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '.08em',
   textTransform: 'uppercase',
-  color: '#6b7280'
+  color: '#667085'
 };
 
 const fieldValue: CSSProperties = {
-  color: '#0b192d',
-  fontSize: '0.88rem'
+  fontSize: '16px',
+  fontWeight: 700,
+  color: '#101828'
+};
+
+const testingBox: CSSProperties = {
+  display: 'grid',
+  gap: '8px',
+  padding: '14px',
+  borderRadius: '16px',
+  background: '#faf5ff',
+  border: '1px solid rgba(168,85,247,.14)'
+};
+
+const testingPill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '24px',
+  padding: '0 10px',
+  borderRadius: '999px',
+  background: '#ede9fe',
+  color: '#6d28d9',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase'
 };
 
 const toggleRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '0.5rem',
-  fontSize: '0.82rem',
-  color: '#374151'
+  justifyContent: 'space-between',
+  gap: '12px',
+  padding: '12px 14px',
+  borderRadius: '14px',
+  background: '#fff',
+  border: '1px solid rgba(168,85,247,.12)'
+};
+
+const toggleCopy: CSSProperties = {
+  display: 'grid',
+  gap: '2px'
+};
+
+const toggleLabel: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 700,
+  color: '#101828'
+};
+
+const toggleHelp: CSSProperties = {
+  fontSize: '11px',
+  color: '#667085'
+};
+
+const switchStyle: CSSProperties = {
+  position: 'relative',
+  width: '42px',
+  height: '24px',
+  borderRadius: '999px',
+  background: '#c4b5fd',
+  boxShadow: 'inset 0 0 0 1px rgba(109,40,217,.12)',
+  border: 'none',
+  cursor: 'pointer'
+};
+
+const switchToggle: CSSProperties = {
+  ...switchStyle,
+  background: '#16a34a',
+  boxShadow: 'inset 0 0 0 1px rgba(22,163,74,.12)'
 };
 
 const errorText: CSSProperties = {
   margin: 0,
-  padding: '0.7rem 0.8rem',
-  borderRadius: '0.75rem',
-  background: 'rgba(192,57,43,0.08)',
-  border: '1px solid rgba(192,57,43,0.18)',
+  padding: '14px',
+  borderRadius: '16px',
+  background: 'rgba(192,57,43,.08)',
+  border: '1px solid rgba(192,57,43,.18)',
   color: '#c0392b',
-  fontSize: '0.82rem'
+  fontSize: '13px'
 };
 
-const actions: CSSProperties = {
+const modalActions: CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',
-  gap: '0.65rem',
+  gap: '10px',
   flexWrap: 'wrap'
 };
 
 const cancelButton: CSSProperties = {
-  border: '1px solid #e5e7eb',
-  borderRadius: '0.55rem',
-  padding: '0.7rem 1rem',
-  background: '#ffffff',
-  color: '#374151',
-  fontWeight: 600,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: '12px',
+  padding: '10px 14px',
+  fontWeight: 700,
+  fontSize: '13px',
+  border: '1px solid #c7d2fe',
+  background: '#fff',
+  color: '#5f6fff',
   cursor: 'pointer'
 };
 
 const confirmButton: CSSProperties = {
-  border: 'none',
-  borderRadius: '0.55rem',
-  padding: '0.7rem 1rem',
-  background: '#16a34a',
-  color: '#ffffff',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: '12px',
+  padding: '10px 14px',
   fontWeight: 700,
+  fontSize: '13px',
+  border: '1px solid #16a34a',
+  background: '#16a34a',
+  color: '#fff',
   cursor: 'pointer'
 };

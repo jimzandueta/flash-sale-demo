@@ -1,24 +1,29 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { SessionResponse } from '../api/client';
 import { PageShell } from '../components/PageShell';
 import { formatUsd, storefrontPrice } from '../storefrontPricing';
+import { formatDateTime } from '../dateUtils';
 import type { Notice, PurchaseSummary } from '../types';
 
 type Props = {
   session: SessionResponse | null;
   notice: Notice | null;
   purchases: PurchaseSummary[];
+  dock?: ReactNode;
   onBack: () => void;
 };
 
-export function ConfirmationPage({ session, notice, purchases, onBack }: Props) {
+export function ConfirmationPage({ session, notice, purchases, dock, onBack }: Props) {
   return (
     <PageShell
-      page="confirmation"
-      title="Order confirmed"
-      description="Purchased items remain available here as a receipt view."
-      session={session}
+      header={{
+        eyebrow: 'Confirmation',
+        headline: 'Order confirmed',
+        supportingCopy: 'Purchased items remain available here as a receipt view.',
+        chip: session ? { label: 'Session', value: session.displayName } : undefined
+      }}
       notice={notice}
+      dock={dock}
     >
       <section style={centerLayout}>
         <div style={receiptCard}>
@@ -44,15 +49,6 @@ export function ConfirmationPage({ session, notice, purchases, onBack }: Props) 
       </section>
     </PageShell>
   );
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
 }
 
 function formatPrice(purchase: PurchaseSummary) {

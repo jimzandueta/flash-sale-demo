@@ -14,7 +14,7 @@
     "status": "active",
     "startsAt": "2026-05-06T10:15:00Z",
     "endsAt": "2026-05-06T12:30:00Z",
-    "initialStock": 5,
+    "initialStock": 2,
     "reservationTtlSeconds": 300
   },
   {

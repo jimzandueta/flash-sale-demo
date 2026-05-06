@@ -11,4 +11,10 @@ describe('getAppConfig', () => {
   it('reads the default reservation ttl from env', () => {
     expect(getAppConfig().defaultReservationTtlSeconds).toBe(300);
   });
+
+  it('falls back to a 3 minute reservation ttl when env is unset', () => {
+    delete process.env.DEFAULT_RESERVATION_TTL_SECONDS;
+
+    expect(getAppConfig().defaultReservationTtlSeconds).toBe(180);
+  });
 });

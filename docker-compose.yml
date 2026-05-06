@@ -1,18 +1,18 @@
 x-app-environment: &app-environment
-  AWS_ACCESS_KEY_ID: test
-  AWS_SECRET_ACCESS_KEY: test
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
   AWS_REGION: ${AWS_REGION:-us-east-1}
   REDIS_URL: ${REDIS_URL:-redis://redis:6379}
-  DEFAULT_RESERVATION_TTL_SECONDS: ${DEFAULT_RESERVATION_TTL_SECONDS:-300}
+  DEFAULT_RESERVATION_TTL_SECONDS: ${DEFAULT_RESERVATION_TTL_SECONDS:-180}
   RESERVATIONS_TABLE: ${RESERVATIONS_TABLE:-flash-sale-reservations-local}
   RESERVATION_EVENTS_QUEUE_URL: ${RESERVATION_EVENTS_QUEUE_URL:-http://localstack:4566/000000000000/dev-reservation-events}
   PURCHASE_EVENTS_QUEUE_URL: ${PURCHASE_EVENTS_QUEUE_URL:-http://localstack:4566/000000000000/dev-purchase-events}
   EXPIRY_EVENTS_QUEUE_URL: ${EXPIRY_EVENTS_QUEUE_URL:-http://localstack:4566/000000000000/dev-expiry-events}
   SQS_ENDPOINT: ${SQS_ENDPOINT:-http://localstack:4566}
   DYNAMO_ENDPOINT: ${DYNAMO_ENDPOINT:-http://dynamodb-local:8000}
+  LOCAL_WORKER_MODE: ${LOCAL_WORKER_MODE:-manual}
   WORKER_POLL_WAIT_SECONDS: ${WORKER_POLL_WAIT_SECONDS:-5}
   WORKER_POLL_MAX_MESSAGES: ${WORKER_POLL_MAX_MESSAGES:-10}
-  DEFAULT_TTL_PARAMETER_NAME: ${DEFAULT_TTL_PARAMETER_NAME:-/flash-sale/config/default-reservation-ttl-seconds}
 
 services:
   redis:
@@ -65,7 +65,7 @@ services:
     working_dir: /app
     environment:
       <<: *app-environment
-      WORKER_HEARTBEAT_INTERVAL_MS: 30000
+      WORKER_HEARTBEAT_INTERVAL_MS: ${WORKER_HEARTBEAT_INTERVAL_MS:-5000}
     depends_on:
       - redis
       - localstack
@@ -82,7 +82,7 @@ services:
     working_dir: /app
     environment:
       <<: *app-environment
-      EXPIRY_SWEEP_INTERVAL_MS: 60000
+      EXPIRY_SWEEP_INTERVAL_MS: ${EXPIRY_SWEEP_INTERVAL_MS:-10000}
     depends_on:
       - redis
       - localstack

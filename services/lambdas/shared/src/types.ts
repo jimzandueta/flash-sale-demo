@@ -5,4 +5,5 @@ export type SaleSummary = {
   startsAt: string;
   endsAt: string;
   reservationTtlSeconds: number;
+  remainingStock?: number;
 };

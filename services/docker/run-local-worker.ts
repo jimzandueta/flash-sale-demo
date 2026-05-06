@@ -1,8 +1,8 @@
 import { pollQueuesOnce } from '../lambdas/reservation-worker/src/poller';
+import { resolveLocalWorkerMode } from './localWorkerMode';
 
-const heartbeatIntervalMs = Number(process.env.WORKER_HEARTBEAT_INTERVAL_MS ?? '30000');
-
-console.log(`[reservation-worker] local heartbeat every ${heartbeatIntervalMs}ms`);
+const heartbeatIntervalMs = Number(process.env.WORKER_HEARTBEAT_INTERVAL_MS ?? '5000');
+const workerMode = resolveLocalWorkerMode();
 
 async function runLoop() {
   try {
@@ -13,8 +13,13 @@ async function runLoop() {
   }
 }
 
-await runLoop();
+if (workerMode === 'manual') {
+  console.log('[reservation-worker] worker mode manual; waiting for debug trigger');
+} else {
+  console.log(`[reservation-worker] worker mode heartbeat; local heartbeat every ${heartbeatIntervalMs}ms`);
+  await runLoop();
 
-setInterval(() => {
-  void runLoop();
-}, heartbeatIntervalMs);
+  setInterval(() => {
+    void runLoop();
+  }, heartbeatIntervalMs);
+}

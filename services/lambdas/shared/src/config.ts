@@ -16,7 +16,7 @@ export function getAppConfig(): AppConfig {
   return {
     awsRegion: process.env.AWS_REGION ?? 'us-east-1',
     redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
-    defaultReservationTtlSeconds: Number(process.env.DEFAULT_RESERVATION_TTL_SECONDS ?? '300'),
+    defaultReservationTtlSeconds: Number(process.env.DEFAULT_RESERVATION_TTL_SECONDS ?? '180'),
     reservationsTable: process.env.RESERVATIONS_TABLE ?? 'flash-sale-reservations-local',
     reservationEventsQueueUrl:
       process.env.RESERVATION_EVENTS_QUEUE_URL ??

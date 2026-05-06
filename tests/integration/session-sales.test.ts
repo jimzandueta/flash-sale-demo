@@ -32,4 +32,44 @@ describe('session and sales endpoints', () => {
       ])
     );
   });
+
+  it('lists active sales with remaining Redis stock', async () => {
+    const originalTtl = process.env.DEFAULT_RESERVATION_TTL_SECONDS;
+    delete process.env.DEFAULT_RESERVATION_TTL_SECONDS;
+
+    const app = await buildServer();
+
+    try {
+      const salesResponse = await app.inject({
+        method: 'GET',
+        url: '/sales'
+      });
+
+      expect(salesResponse.statusCode).toBe(200);
+      expect(salesResponse.json().items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            saleId: 'sale_sneaker_001',
+            status: 'active',
+            remainingStock: 10,
+            reservationTtlSeconds: 180
+          }),
+          expect.objectContaining({
+            saleId: 'sale_jacket_002',
+            status: 'active',
+            remainingStock: 5,
+            reservationTtlSeconds: 180
+          })
+        ])
+      );
+    } finally {
+      if (originalTtl === undefined) {
+        delete process.env.DEFAULT_RESERVATION_TTL_SECONDS;
+      } else {
+        process.env.DEFAULT_RESERVATION_TTL_SECONDS = originalTtl;
+      }
+
+      await app.close();
+    }
+  });
 });

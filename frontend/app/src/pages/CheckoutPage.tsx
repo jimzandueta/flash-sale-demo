@@ -1,9 +1,11 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import type { SaleItem, SessionResponse } from '../api/client';
 import { PageShell } from '../components/PageShell';
 import { PaymentConfirmationModal } from '../components/PaymentConfirmationModal';
 import { PaymentModal } from '../components/PaymentModal';
 import { formatUsd, storefrontPrice } from '../storefrontPricing';
+import { storefrontMeta } from '../storefrontCatalog';
+import { formatDateTime, formatRemaining, formatWindow } from '../dateUtils';
 import type { CartReservation, Notice, PurchaseSummary } from '../types';
 
 type Props = {
@@ -16,6 +18,7 @@ type Props = {
   isCheckingOutIds: Set<string>;
   isCancellingIds: Set<string>;
   simulateFailureIds: Set<string>;
+  dock?: ReactNode;
   activePaymentItem: CartReservation | null;
   paymentConfirmationPurchase: PurchaseSummary | null;
   paymentError: string | null;
@@ -38,6 +41,7 @@ export function CheckoutPage({
   isCheckingOutIds,
   isCancellingIds,
   simulateFailureIds,
+  dock,
   activePaymentItem,
   paymentConfirmationPurchase,
   paymentError,
@@ -51,6 +55,7 @@ export function CheckoutPage({
 }: Props) {
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseSummary | null>(null);
   const salesById = new Map(sales.map((sale) => [sale.saleId, sale]));
+  const activeCart = cart.filter((item) => item.state !== 'expired' && Date.parse(item.expiresAt) > now);
   const rows = [
     ...purchases.map((purchase) => ({ kind: 'purchase' as const, sortAt: purchase.expiresAt, purchase })),
     ...cart.map((item) => ({ kind: 'cart' as const, sortAt: item.expiresAt, item }))
@@ -65,106 +70,98 @@ export function CheckoutPage({
 
   return (
     <PageShell
-      page="checkout"
-      title="Review your cart"
-      session={session}
+      header={{
+        eyebrow: 'KooPiBi / Flash Sale / Checkout',
+        headline: 'Checkout',
+        supportingCopy: 'Pay held items one at a time before their timers expire.'
+      }}
       notice={notice}
+      dock={dock}
     >
-      {rows.map((row, index) => {
-        if (row.kind === 'purchase') {
-          const price = formatPrice(row.purchase.itemName, row.purchase.price);
+      <div style={checkoutLayout}>
+        <div style={queueCard}>
+          <div style={queueList}>
+            {rows.map((row, index) => {
+              if (row.kind === 'purchase') {
+                const price = formatPrice(row.purchase.itemName, row.purchase.price);
 
-          return (
-            <article key={row.purchase.reservationId} style={purchasedCard}>
-              <div style={topRow}>
-                <p style={eyebrowSuccess}>✓ Purchased</p>
-                <span style={timerPurchased}>Paid at {formatDateTime(row.purchase.purchasedAt)}</span>
-              </div>
+                return (
+                  <article key={row.purchase.reservationId} style={queueItemPurchased}>
+                    <div style={queueHead}>
+                      <p style={queueEyebrowPurchased}>Purchased</p>
+                      <span style={mutedText}>Paid {formatDateTime(row.purchase.purchasedAt)}</span>
+                    </div>
+                    <div style={queueMain}>
+                      <div aria-hidden="true" style={{ ...queueArt, background: storefrontMeta(row.purchase.itemName).gradient }} />
+                      <div style={queueCopy}>
+                        <strong style={queueName}>{row.purchase.itemName}</strong>
+                        <p style={queueNote}>Payment completed successfully.</p>
+                      </div>
+                      <span style={queuePrice}>{price}</span>
+                    </div>
+                    <div style={queueActions}>
+                      <span style={saleWindowPill}>{formatSaleWindow(salesById.get(row.purchase.saleId))}</span>
+                      <div style={queueActionButtons}>
+                        <button style={btnSecondary} onClick={() => setSelectedPurchase(row.purchase)}>
+                          Show payment confirmation
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              }
 
-              <div style={mainRow}>
-                <div aria-hidden="true" style={imagePlaceholder}>
-                  {imageLabel(row.purchase.itemName)}
-                </div>
-                <div style={itemInfo}>
-                  <div style={namePriceRow}>
-                    <p style={itemName}>{row.purchase.itemName}</p>
-                    <p style={itemPrice}>{price}</p>
+              const item = row.item;
+              const price = formatPrice(item.itemName, item.price);
+              const msRemaining = Date.parse(item.expiresAt) - now;
+              const isExpired = item.state === 'expired' || msRemaining <= 0;
+              const isUrgent = msRemaining > 0 && msRemaining < 60_000;
+              const isBuying = isCheckingOutIds.has(item.reservationId);
+              const isCancelling = isCancellingIds.has(item.reservationId);
+              const activeIndex = rows.slice(0, index).filter((entry) => entry.kind === 'cart' && entry.item.state !== 'expired').length;
+
+              return (
+                <article key={item.reservationId} style={isUrgent ? queueItemUrgent : queueItem}>
+                  <div style={queueHead}>
+                    <p style={isUrgent ? queueEyebrowUrgent : queueEyebrow}>
+                      {isUrgent ? 'Expires soonest' : activeIndex === 0 ? 'Up next' : 'Up next'}
+                    </p>
+                    <span style={isUrgent ? timerPillUrgent : timerPill}>
+                      {isExpired ? 'Expired' : formatRemaining(item.expiresAt, now)}
+                    </span>
                   </div>
-                  <p style={reservationIdText}>{row.purchase.reservationId}</p>
-                </div>
-              </div>
+                  <div style={queueMain}>
+                    <div aria-hidden="true" style={{ ...queueArt, background: storefrontMeta(item.itemName).gradient }} />
+                    <div style={queueCopy}>
+                      <strong style={queueName}>{item.itemName}</strong>
+                      <p style={queueNote}>
+                        {isUrgent ? 'Pay this hold first to avoid losing the item.' : 'Held and ready once the first payment is complete.'}
+                      </p>
+                    </div>
+                    <span style={queuePrice}>{price}</span>
+                  </div>
+                  <div style={queueActions}>
+                    <span style={saleWindowPill}>{formatSaleWindow(salesById.get(item.saleId))}</span>
+                    <div style={queueActionButtons}>
+                      <button style={linkBtn} disabled={isBuying || isCancelling} onClick={() => onRemoveFromCart(item.reservationId)}>
+                        {isCancelling ? 'Removing...' : 'Remove from cart'}
+                      </button>
+                      {isExpired ? null : (
+                        <button style={isUrgent ? btnUrgent : btnPrimary} disabled={isBuying || isCancelling} onClick={() => onOpenPayment(item.reservationId)}>
+                          {isBuying ? 'Processing...' : 'Pay now'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
 
-              <div style={bottomRow}>
-                <span style={windowText}>{formatSaleWindow(salesById.get(row.purchase.saleId))}</span>
-                <button style={confirmationBtn} onClick={() => setSelectedPurchase(row.purchase)}>
-                  Show payment confirmation
-                </button>
-              </div>
-            </article>
-          );
-        }
-
-        const item = row.item;
-        const price = formatPrice(item.itemName, item.price);
-        const msRemaining = Date.parse(item.expiresAt) - now;
-        const isUrgent = msRemaining > 0 && msRemaining < 60_000;
-        const isBuying = isCheckingOutIds.has(item.reservationId);
-        const isCancelling = isCancellingIds.has(item.reservationId);
-        const activeIndex = rows.slice(0, index).filter((entry) => entry.kind === 'cart').length;
-
-        return (
-          <article key={item.reservationId} style={isUrgent ? urgentCard : normalCard}>
-            <div style={topRow}>
-              <p style={isUrgent ? eyebrowUrgent : eyebrow}>
-                {isUrgent ? '⚡ Expires soonest - pay this first' : activeIndex === 0 ? 'Pay next' : 'Up next'}
-              </p>
-              <span style={isUrgent ? timerUrgent : timerNormal}>
-                {formatRemaining(item.expiresAt, now)}
-              </span>
-            </div>
-
-            <div style={mainRow}>
-              <div aria-hidden="true" style={imagePlaceholder}>
-                {imageLabel(item.itemName)}
-              </div>
-              <div style={itemInfo}>
-                <div style={namePriceRow}>
-                  <p style={cardTitle}>{item.itemName}</p>
-                  <p style={itemPrice}>{price}</p>
-                </div>
-                <p style={metaText}>{item.reservationId}</p>
-              </div>
-            </div>
-
-            {isUrgent ? (
-              <p style={urgentWarning}>⚠ Less than 1 minute — this hold will expire soon</p>
-            ) : null}
-
-            <div style={bottomRow}>
-              <span style={windowText}>{formatSaleWindow(salesById.get(item.saleId))}</span>
-              <div style={actionsRow}>
-                <button
-                  style={isUrgent ? removeUrgentBtn : removeBtn}
-                  disabled={isBuying || isCancelling}
-                  onClick={() => onRemoveFromCart(item.reservationId)}
-                >
-                  {isCancelling ? 'Removing...' : 'Remove from cart'}
-                </button>
-                <button
-                  style={isUrgent ? buyUrgentBtn : buyNormalBtn}
-                  disabled={isBuying || isCancelling}
-                  onClick={() => onOpenPayment(item.reservationId)}
-                >
-                  {isBuying ? 'Processing...' : 'Pay now'}
-                </button>
-              </div>
-            </div>
-          </article>
-        );
-      })}
-
-      <div style={footerRow}>
-        <button style={ghostBtn} onClick={onKeepShopping}>← Keep shopping</button>
+          <button style={btnSecondary} onClick={onKeepShopping}>
+            Back to products
+          </button>
+        </div>
       </div>
 
       {activePaymentItem ? (
@@ -213,254 +210,222 @@ function formatSaleWindow(sale: SaleItem | undefined) {
   return formatWindow(sale.startsAt, sale.endsAt);
 }
 
-function formatWindow(startsAt: string, endsAt: string) {
-  const fmt = (value: string) => new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  return `${fmt(startsAt)} - ${fmt(endsAt)}`;
-}
-
-function formatRemaining(expiresAt: string, now: number) {
-  const ms = Date.parse(expiresAt) - now;
-  if (ms <= 0) return '0:00';
-  const seconds = Math.floor(ms / 1000);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-}
-
-const purchasedCard: CSSProperties = {
-  background: '#f8fafc',
-  border: '1px solid #dbe5f0',
-  borderRadius: '0.875rem',
-  padding: '1rem',
+const checkoutLayout: CSSProperties = {
   display: 'grid',
-  gap: '0.8rem'
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: '18px',
+  alignItems: 'start'
 };
 
-const eyebrowSuccess: CSSProperties = {
-  margin: '0 0 0.4rem',
-  fontSize: '0.7rem',
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
-  color: '#4b5563',
-  fontWeight: 700
+const queueCard: CSSProperties = {
+  display: 'grid',
+  gap: '14px',
+  padding: '20px',
+  borderRadius: '22px',
+  border: '1px solid rgba(95,111,255,.14)',
+  boxShadow: '0 18px 36px rgba(95,111,255,.08)',
+  background: 'linear-gradient(180deg,#ffffff 0%,#f8faff 100%)'
 };
 
-const topRow: CSSProperties = {
+const queueList: CSSProperties = {
+  display: 'grid',
+  gap: '12px'
+};
+
+const queueItem: CSSProperties = {
+  display: 'grid',
+  gap: '10px',
+  padding: '16px',
+  borderRadius: '18px',
+  background: '#fff',
+  border: '1px solid rgba(95,111,255,.12)',
+  boxShadow: '0 12px 26px rgba(15,23,42,.05)'
+};
+
+const queueItemUrgent: CSSProperties = {
+  ...queueItem,
+  background: 'linear-gradient(180deg,#ffebee 0%,#ffffff 100%)',
+  border: '2px solid #ef5350',
+  boxShadow: '0 14px 30px rgba(239,83,80,.12)'
+};
+
+const queueItemPurchased: CSSProperties = {
+  ...queueItem,
+  background: '#f3faf5',
+  border: '1px solid #b7e4c7',
+  boxShadow: 'none'
+};
+
+const queueHead: CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
   justifyContent: 'space-between',
-  gap: '0.75rem',
+  alignItems: 'center',
+  gap: '12px',
   flexWrap: 'wrap'
 };
 
-const mainRow: CSSProperties = {
+const queueMain: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '3.25rem minmax(0, 1fr)',
-  gap: '0.8rem',
+  gridTemplateColumns: '56px minmax(0,1fr) auto',
+  gap: '14px',
   alignItems: 'center'
 };
 
-const checkBadge: CSSProperties = {
-  width: '1.3rem',
-  height: '1.3rem',
-  background: '#dcfce7',
-  borderRadius: '999px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: '0.72rem',
-  color: '#166534',
-  flexShrink: 0
+const queueArt: CSSProperties = {
+  width: '56px',
+  aspectRatio: '1/1',
+  borderRadius: '16px',
+  border: '1px solid rgba(15,23,42,.08)'
 };
 
-const imagePlaceholder: CSSProperties = {
+const queueCopy: CSSProperties = {
   display: 'grid',
-  placeItems: 'center',
-  width: '3.25rem',
-  height: '3.25rem',
-  borderRadius: '0.8rem',
-  background: '#eff3f8',
-  color: '#6b7280',
-  fontSize: '0.75rem',
+  gap: '6px'
+};
+
+const queueName: CSSProperties = {
+  fontSize: '20px',
   fontWeight: 700,
-  letterSpacing: '0.08em'
+  color: '#101828'
 };
 
-const itemInfo: CSSProperties = {
-  display: 'grid',
-  gap: '0.2rem',
-  minWidth: 0
-};
-
-const namePriceRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '0.75rem'
-};
-
-const itemName: CSSProperties = { margin: 0, fontWeight: 700, fontSize: '0.9rem', color: '#0b192d' };
-const itemPrice: CSSProperties = { margin: 0, color: '#095ae9', fontSize: '0.92rem', fontWeight: 700, flexShrink: 0 };
-const reservationIdText: CSSProperties = { margin: '0.1rem 0 0', fontSize: '0.74rem', color: '#6b7280' };
-
-const normalCard: CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid #e5e7eb',
-  borderRadius: '0.875rem',
-  padding: '1rem',
-  boxShadow: '0 1px 6px rgba(9,90,233,0.06)',
-  display: 'grid',
-  gap: '0.8rem'
-};
-
-const urgentCard: CSSProperties = {
-  background: '#fff8f8',
-  border: '2px solid #c0392b',
-  borderRadius: '0.875rem',
-  padding: '1rem',
-  boxShadow: '0 4px 18px rgba(192,57,43,0.15)',
-  display: 'grid',
-  gap: '0.8rem'
-};
-
-const eyebrow: CSSProperties = {
-  margin: '0 0 0.2rem',
-  fontSize: '0.7rem',
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase',
-  color: '#095ae9',
-  fontWeight: 700
-};
-
-const eyebrowUrgent: CSSProperties = {
-  ...eyebrow,
-  color: '#c0392b'
-};
-
-const cardTitle: CSSProperties = {
+const queueNote: CSSProperties = {
   margin: 0,
-  fontSize: '1rem',
-  fontWeight: 700,
-  color: '#0b192d'
+  fontSize: '13px',
+  lineHeight: 1.45,
+  color: '#667085'
 };
 
-const bottomRow: CSSProperties = {
+const queuePrice: CSSProperties = {
+  fontSize: '22px',
+  fontWeight: 800,
+  color: '#101828',
+  textAlign: 'right',
+  whiteSpace: 'nowrap'
+};
+
+const queueActions: CSSProperties = {
   display: 'flex',
-  alignItems: 'center',
   justifyContent: 'space-between',
-  gap: '0.75rem',
+  alignItems: 'center',
+  gap: '12px',
   flexWrap: 'wrap'
 };
 
-const metaText: CSSProperties = { margin: 0, fontSize: '0.72rem', color: '#6b7280' };
-
-const windowText: CSSProperties = { fontSize: '0.78rem', color: '#4b5563' };
-
-const actionsRow: CSSProperties = {
+const queueActionButtons: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '0.55rem',
-  marginLeft: 'auto',
-  flexWrap: 'wrap',
-  justifyContent: 'flex-end'
+  gap: '10px',
+  flexWrap: 'wrap'
 };
 
-const timerNormal: CSSProperties = {
-  fontSize: '0.88rem',
+const timerPill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '28px',
+  padding: '0 12px',
+  borderRadius: '999px',
+  background: '#eef2ff',
+  color: '#4f46e5',
+  fontSize: '11px',
   fontWeight: 700,
-  color: '#095ae9',
-  background: '#e0f0ff',
-  padding: '0.22rem 0.65rem',
-  borderRadius: '999px'
+  letterSpacing: '.08em',
+  textTransform: 'uppercase'
 };
 
-const timerUrgent: CSSProperties = {
-  ...timerNormal,
-  color: '#ffffff',
-  background: '#c0392b'
+const timerPillUrgent: CSSProperties = {
+  ...timerPill,
+  background: '#d32f2f',
+  color: '#fff'
 };
 
-const timerPurchased: CSSProperties = {
-  fontSize: '0.74rem',
-  fontWeight: 600,
-  color: '#6b7280',
-  background: '#eef2f7',
-  padding: '0.22rem 0.65rem',
-  borderRadius: '999px'
+const saleWindowPill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '28px',
+  padding: '0 12px',
+  borderRadius: '999px',
+  background: '#f8fafc',
+  color: '#475467',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  border: '1px solid rgba(15,23,42,.08)'
 };
 
-const urgentWarning: CSSProperties = {
-  margin: '0 0 0.6rem',
-  background: 'rgba(192,57,43,0.07)',
-  border: '1px solid rgba(192,57,43,0.18)',
-  borderRadius: '0.5rem',
-  padding: '0.4rem 0.65rem',
-  fontSize: '0.78rem',
-  color: '#c0392b'
+const queueEyebrow: CSSProperties = {
+  margin: 0,
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '.1em',
+  textTransform: 'uppercase',
+  color: '#5f6fff'
 };
 
-const buyNormalBtn: CSSProperties = {
-  background: '#095ae9',
-  color: '#ffffff',
+const queueEyebrowUrgent: CSSProperties = {
+  ...queueEyebrow,
+  color: '#d32f2f'
+};
+
+const queueEyebrowPurchased: CSSProperties = {
+  ...queueEyebrow,
+  color: '#15803d'
+};
+
+const mutedText: CSSProperties = {
+  fontSize: '12px',
+  color: '#667085'
+};
+
+const btnPrimary: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: '12px',
+  padding: '10px 14px',
+  fontWeight: 700,
+  fontSize: '13px',
+  border: '1px solid transparent',
+  background: '#5f6fff',
+  color: '#fff',
+  cursor: 'pointer'
+};
+
+const btnUrgent: CSSProperties = {
+  ...btnPrimary,
+  background: '#d32f2f',
+  borderColor: '#d32f2f'
+};
+
+const btnSuccess: CSSProperties = {
+  ...btnPrimary,
+  background: '#16a34a',
+  borderColor: '#16a34a'
+};
+
+const btnSecondary: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: '12px',
+  padding: '10px 14px',
+  fontWeight: 700,
+  fontSize: '13px',
+  border: '1px solid #c7d2fe',
+  background: '#fff',
+  color: '#5f6fff',
+  cursor: 'pointer'
+};
+
+const linkBtn: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 700,
+  color: '#667085',
+  background: 'none',
   border: 'none',
-  borderRadius: '0.5rem',
-  padding: '0.55rem 0.9rem',
-  fontSize: '0.82rem',
-  fontWeight: 700,
-  cursor: 'pointer'
-};
-
-const buyUrgentBtn: CSSProperties = {
-  ...buyNormalBtn,
-  background: '#c0392b',
-  boxShadow: '0 2px 10px rgba(192,57,43,0.25)'
-};
-
-const removeBtn: CSSProperties = {
-  border: '1px solid #e5e7eb',
-  background: 'transparent',
-  color: '#6b7280',
-  borderRadius: '0.4rem',
-  padding: '0.24rem 0.55rem',
-  fontSize: '0.75rem',
-  fontWeight: 600,
-  cursor: 'pointer'
-};
-
-const removeUrgentBtn: CSSProperties = {
-  ...removeBtn,
-  border: '1px solid rgba(192,57,43,0.35)',
-  color: '#c0392b'
-};
-
-const confirmationBtn: CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid #d1d9e6',
-  color: '#374151',
-  borderRadius: '0.5rem',
-  padding: '0.5rem 0.85rem',
-  fontSize: '0.8rem',
-  fontWeight: 600,
   cursor: 'pointer',
-  marginLeft: 'auto'
-};
-
-const footerRow: CSSProperties = { display: 'flex', gap: '0.5rem' };
-
-const ghostBtn: CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid #e5e7eb',
-  color: '#374151',
-  borderRadius: '0.5rem',
-  padding: '0.45rem 0.8rem',
-  fontSize: '0.82rem',
-  fontWeight: 600,
-  cursor: 'pointer'
+  padding: 0
 };

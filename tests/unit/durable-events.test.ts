@@ -48,6 +48,36 @@ describe('durable events', () => {
     });
   });
 
+  it('normalizes reservation-cancelled payloads before publish', () => {
+    expect(
+      buildDurableEvent('reservation-cancelled', {
+        reservationId: 'res_cancel_1',
+        saleId: 'sale_sneaker_001',
+        userToken: 'usr_tok_3'
+      } as never)
+    ).toEqual({
+      eventType: 'reservation-cancelled',
+      eventId: 'reservation-cancelled:res_cancel_1',
+      occurredAt: expect.any(String),
+      reservationId: 'res_cancel_1',
+      saleId: 'sale_sneaker_001',
+      userToken: 'usr_tok_3'
+    });
+  });
+
+  it('maps reservation-cancelled to the reservation events queue', () => {
+    expect(
+      queueUrlForEventType(
+        {
+          reservationEventsQueueUrl: 'reservation-queue',
+          purchaseEventsQueueUrl: 'purchase-queue',
+          expiryEventsQueueUrl: 'expiry-queue'
+        },
+        'reservation-cancelled' as never
+      )
+    ).toBe('reservation-queue');
+  });
+
   it('throws when queue mapping is missing for an event type', () => {
     expect(() =>
       queueUrlForEventType(

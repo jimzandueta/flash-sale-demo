@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReservationItem } from '../api/client';
+import { formatRemaining } from '../dateUtils';
 
 type ReservationPanelProps = {
   items: ReservationItem[];
@@ -50,20 +51,6 @@ export function ReservationPanel({
       )}
     </section>
   );
-}
-
-function formatRemaining(expiresAt: string, now: number) {
-  const remainingMs = Date.parse(expiresAt) - now;
-
-  if (remainingMs <= 0) {
-    return '0:00';
-  }
-
-  const totalSeconds = Math.floor(remainingMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 const panel: React.CSSProperties = {

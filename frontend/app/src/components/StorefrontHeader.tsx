@@ -1,95 +1,149 @@
 import type { CSSProperties } from 'react';
+import type { HeaderChip, HeaderStep } from '../types';
 
 type Props = {
   eyebrow: string;
-  title: string;
-  description?: string;
-  sessionLabel?: string;
+  headline: string;
+  supportingCopy?: string;
+  steps?: HeaderStep[];
+  chip?: HeaderChip;
 };
 
-export function StorefrontHeader({ eyebrow, title, description, sessionLabel }: Props) {
+export function StorefrontHeader({ eyebrow, headline, supportingCopy, steps, chip }: Props) {
   return (
-    <header style={masthead}>
-      <div style={stack}>
+    <header style={flowHeader}>
+      <div style={brandStack}>
         <p style={eyebrowText}>{eyebrow}</p>
-        <h1 style={pageTitle}>{title}</h1>
-        {description ? <p style={pageDescription}>{description}</p> : null}
+        <h1 style={headlineText}>{headline}</h1>
+        {supportingCopy ? <p style={subtleText}>{supportingCopy}</p> : null}
+        {steps?.length ? (
+          <div style={flowSteps}>
+            {steps.map((step) => (
+              <span key={step.label} style={stepStyle(step.state)}>
+                {step.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      {sessionLabel ? (
+      {chip ? (
         <div style={sessionChip}>
-          <span style={sessionLabelText}>Session</span>
-          <strong style={sessionValue}>{sessionLabel}</strong>
+          <span style={fieldLabel}>{chip.label}</span>
+          <span style={fieldValue}>{chip.value}</span>
+          {chip.subtle ? <span style={mutedText}>{chip.subtle}</span> : null}
         </div>
       ) : null}
     </header>
   );
 }
 
-const masthead: CSSProperties = {
+const flowHeader: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  gap: '1rem',
-  flexWrap: 'wrap',
-  padding: '0.95rem 1rem',
-  borderRadius: '0.95rem',
-  border: '1px solid rgba(9,90,233,0.12)',
-  background: '#ffffff',
-  boxShadow: '0 1px 6px rgba(9,90,233,0.06)'
+  gap: '16px',
+  padding: '18px 20px',
+  border: '1px solid rgba(91, 117, 255, 0.16)',
+  borderRadius: '18px',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,255,0.94))',
+  flexWrap: 'wrap'
 };
 
-const stack: CSSProperties = {
+const brandStack: CSSProperties = {
   display: 'grid',
-  gap: '0.25rem'
+  gap: '4px'
 };
 
 const eyebrowText: CSSProperties = {
   margin: 0,
-  fontSize: '0.72rem',
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  color: '#095ae9',
-  fontWeight: 700
-};
-
-const pageTitle: CSSProperties = {
-  margin: '0.2rem 0 0',
-  fontFamily: 'Avenir Next, Gill Sans, sans-serif',
-  fontSize: 'clamp(1.15rem, 2.3vw, 1.5rem)',
-  lineHeight: 1.05,
+  fontSize: '11px',
   fontWeight: 700,
-  color: '#0b192d'
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: '#5f6fff'
 };
 
-const pageDescription: CSSProperties = {
+const headlineText: CSSProperties = {
   margin: 0,
-  maxWidth: '38rem',
-  color: '#374151',
-  lineHeight: 1.45,
-  fontSize: '0.86rem'
+  fontSize: '24px',
+  lineHeight: 1.05,
+  color: '#101828'
 };
+
+const subtleText: CSSProperties = {
+  margin: 0,
+  color: '#475467',
+  fontSize: '14px',
+  lineHeight: 1.55
+};
+
+const flowSteps: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px',
+  marginTop: '10px'
+};
+
+function stepStyle(state: HeaderStep['state']): CSSProperties {
+  const base: CSSProperties = {
+    padding: '6px 10px',
+    borderRadius: '999px',
+    fontSize: '11px',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    border: '1px solid #d0d5dd',
+    color: '#667085',
+    background: '#ffffff'
+  };
+
+  if (state === 'active') {
+    return {
+      ...base,
+      color: '#ffffff',
+      background: '#5f6fff',
+      borderColor: '#5f6fff'
+    };
+  }
+
+  if (state === 'complete') {
+    return {
+      ...base,
+      color: '#5f6fff',
+      background: '#eef2ff',
+      borderColor: '#c7d2fe'
+    };
+  }
+
+  return base;
+}
 
 const sessionChip: CSSProperties = {
   display: 'grid',
-  gap: '0.15rem',
-  padding: '0.55rem 0.75rem',
-  minWidth: '150px',
-  borderRadius: '999px',
-  border: '1px solid rgba(9,90,233,0.12)',
-  background: '#f8faff',
-  justifyItems: 'start'
+  gap: '2px',
+  minWidth: '220px',
+  padding: '12px 14px',
+  borderRadius: '14px',
+  background: '#ffffff',
+  border: '1px solid #e4e7ec'
 };
 
-const sessionLabelText: CSSProperties = {
-  fontSize: '0.62rem',
+const fieldLabel: CSSProperties = {
+  fontSize: '11px',
   fontWeight: 700,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
-  color: '#6b7280'
+  color: '#667085'
 };
 
-const sessionValue: CSSProperties = {
-  color: '#0b192d',
-  fontSize: '0.9rem'
+const fieldValue: CSSProperties = {
+  color: '#101828',
+  fontWeight: 600
+};
+
+const mutedText: CSSProperties = {
+  color: '#667085',
+  fontSize: '13px',
+  lineHeight: 1.45
 };

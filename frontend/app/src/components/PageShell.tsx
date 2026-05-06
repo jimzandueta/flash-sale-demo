@@ -1,35 +1,23 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { SessionResponse } from '../api/client';
-import type { Notice, Page } from '../types';
+import type { HeaderContent, Notice } from '../types';
 import { StorefrontHeader } from './StorefrontHeader';
 
 type Props = {
-  page: Page;
-  title: string;
-  description?: string;
-  session: SessionResponse | null;
+  header: HeaderContent;
   notice: Notice | null;
   children: ReactNode;
-  aside?: ReactNode;
+  dock?: ReactNode;
 };
 
-export function PageShell({ page, title, description, session, notice, children, aside }: Props) {
+export function PageShell({ header, notice, children, dock }: Props) {
   return (
     <main style={shell}>
       <section style={frame}>
-        <StorefrontHeader
-          eyebrow={eyebrowByPage[page]}
-          title={title}
-          description={description}
-          sessionLabel={session?.displayName}
-        />
-
-        {aside}
-
+        <StorefrontHeader {...header} />
         {notice ? <p style={noticeStyle(notice.tone)}>{notice.text}</p> : null}
-
         {children}
       </section>
+      {dock}
     </main>
   );
 }
@@ -61,24 +49,15 @@ const shell: CSSProperties = {
 };
 
 const frame: CSSProperties = {
-  position: 'relative',
   display: 'grid',
-  gap: '0.8rem',
-  maxWidth: '1100px',
+  gap: '16px',
+  maxWidth: '100%',
   margin: '0 auto',
-  padding: '0.95rem',
-  borderRadius: '1rem',
-  background: 'rgba(248, 250, 255, 0.88)',
-  border: '1px solid #e5e7eb',
-  boxShadow: '0 8px 28px rgba(9, 90, 233, 0.06)'
-};
-
-const eyebrowByPage: Record<Page, string> = {
-  landing: 'Bookipi / Flash Sale',
-  'product-list': 'Bookipi / Flash Sale / Products',
-  'product-page': 'Bookipi / Flash Sale / Product',
-  checkout: 'Bookipi / Flash Sale / Checkout',
-  confirmation: 'Bookipi / Flash Sale / Confirmation'
+  padding: '18px',
+  borderRadius: '22px',
+  border: '1px solid rgba(91, 117, 255, 0.12)',
+  background: 'linear-gradient(180deg, #fbfcff 0%, #f3f6ff 100%)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8)'
 };
 
 const noticeBase: CSSProperties = {

@@ -1,13 +1,24 @@
 import Fastify from 'fastify';
+import { CreateTableCommand, DescribeTableCommand, waitUntilTableExists } from '@aws-sdk/client-dynamodb';
 import { checkoutReservation } from '../../checkout-api/src/handler';
 import { cancelReservation, getReservationById, listReservationsForUser, reserveSale } from '../../reservation-api/src/handler';
 import { listSales } from '../../sales-api/src/handler';
 import { createSession } from '../../session-api/src/handler';
+import {
+  buildObservabilitySnapshot,
+  readDynamoObservability,
+  readRedisObservability,
+  readSqsObservability
+} from './debug/observability';
+import { processWorkerNow } from './debug/processWorker';
 import { createRedisClient } from '../../shared/src/redisClient';
 import { listSeedSales } from '../../shared/src/repositories/SalesRepository';
 import { redisKeys } from '../../shared/src/redisKeys';
 import { logger } from '../../shared/src/logger';
 import { RedisReservationEngine } from '../../shared/src/reservation/RedisReservationEngine';
+import { getAppConfig } from '../../shared/src/config';
+import { createLocalDynamoClient } from '../../../../tests/integration/helpers/localAws';
+import { resolveLocalWorkerMode } from '../../../docker/localWorkerMode';
 
 function getUserToken(headers: { 'x-user-token'?: string }) {
   const userToken = headers['x-user-token'];
@@ -19,8 +30,39 @@ function getUserToken(headers: { 'x-user-token'?: string }) {
   return userToken;
 }
 
+async function retryLocalDynamoBootstrap<T>(work: () => Promise<T>) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      return await work();
+    } catch (error) {
+      lastError = error;
+
+      if (!isRetryableLocalDynamoBootstrapError(error) || attempt === 9) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  throw lastError;
+}
+
+function isRetryableLocalDynamoBootstrapError(error: unknown) {
+  const candidate = error as { code?: string; name?: string; message?: string };
+
+  return (
+    candidate?.code === 'ECONNREFUSED' ||
+    candidate?.name === 'TimeoutError' ||
+    candidate?.message?.includes('ECONNREFUSED') === true
+  );
+}
+
 export async function buildServer() {
   const app = Fastify();
+  const config = getAppConfig();
   const seededSales = listSeedSales();
   const salesById = new Map<string, (typeof seededSales)[number]>(
     seededSales.map((sale) => [sale.saleId, sale])
@@ -29,8 +71,19 @@ export async function buildServer() {
     ['sale_sneaker_001', 10],
     ['sale_jacket_002', 5]
   ]);
+  let manualWorkerState: {
+    lastRunAt?: string;
+    lastResult?: {
+      reservation: number;
+      purchase: number;
+      expiry: number;
+    };
+    lastError?: string;
+  } = {};
   const redis = createRedisClient();
   const reservationEngine = new RedisReservationEngine(redis);
+
+  await ensureReservationsTable(config.reservationsTable);
 
   await Promise.all(
     Array.from(saleStocks.entries(), ([saleId, stock]) => redis.set(redisKeys.stock(saleId), String(stock), 'NX'))
@@ -51,7 +104,12 @@ export async function buildServer() {
   app.get('/sales', async () => {
     logger.debug('listing sales');
 
-    return listSales();
+    return listSales({
+      getRemainingStock: async (saleId) => {
+        const raw = await redis.get(redisKeys.stock(saleId));
+        return raw === null ? undefined : Number(raw);
+      }
+    });
   });
 
   app.post('/sales/:saleId/reservations', async (request, reply) => {
@@ -162,5 +220,92 @@ export async function buildServer() {
     return result;
   });
 
+  app.get('/debug/observability', async (request) => {
+    const query = (request.query ?? {}) as {
+      userToken?: string;
+      page?: string;
+      cartCount?: string;
+      purchaseCount?: string;
+      activeSaleCount?: string;
+      userLabel?: string;
+    };
+
+    return buildObservabilitySnapshot({
+      workerMode: resolveLocalWorkerMode(),
+      app: {
+        page: query.page ?? 'unknown',
+        cartCount: Number(query.cartCount ?? '0'),
+        purchaseCount: Number(query.purchaseCount ?? '0'),
+        activeSaleCount: Number(query.activeSaleCount ?? '0'),
+        userLabel: query.userLabel ?? ''
+      },
+      shopper: {
+        userToken: query.userToken,
+        displayName: query.userLabel
+      },
+      readRedis: () =>
+        readRedisObservability(redis, {
+          userToken: query.userToken,
+          saleIds: seededSales.map((sale) => sale.saleId)
+        }),
+      readSqs: () => readSqsObservability(),
+      readDynamo: () =>
+        readDynamoObservability({
+          userToken: query.userToken
+        }),
+      manualWorker: manualWorkerState
+    });
+  });
+
+  app.post('/debug/process-worker', async () => {
+    try {
+      const result = await processWorkerNow();
+      manualWorkerState = {
+        lastRunAt: result.processedAt,
+        lastResult: result.processed,
+        lastError: undefined
+      };
+      return result;
+    } catch (error) {
+      manualWorkerState = {
+        ...manualWorkerState,
+        lastError: error instanceof Error ? error.message : 'Worker processing failed'
+      };
+      throw error;
+    }
+  });
+
   return app;
+}
+
+async function ensureReservationsTable(tableName: string) {
+  const dynamo = createLocalDynamoClient();
+
+  await retryLocalDynamoBootstrap(async () => {
+    try {
+      await dynamo.send(new DescribeTableCommand({ TableName: tableName }));
+      return;
+    } catch (error) {
+      if ((error as { name?: string }).name !== 'ResourceNotFoundException') {
+        throw error;
+      }
+    }
+
+    try {
+      await dynamo.send(
+        new CreateTableCommand({
+          TableName: tableName,
+          BillingMode: 'PAY_PER_REQUEST',
+          KeySchema: [{ AttributeName: 'reservationId', KeyType: 'HASH' }],
+          AttributeDefinitions: [{ AttributeName: 'reservationId', AttributeType: 'S' }]
+        })
+      );
+    } catch (error) {
+      if ((error as { name?: string }).name !== 'ResourceInUseException') {
+        throw error;
+      }
+    }
+
+    await waitUntilTableExists({ client: dynamo, maxWaitTime: 21 }, { TableName: tableName });
+  });
 }

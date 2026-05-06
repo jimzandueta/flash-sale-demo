@@ -1,6 +1,6 @@
 import { releaseExpiredReservations } from '../lambdas/expiry-sweeper/src/worker';
 
-const sweepIntervalMs = Number(process.env.EXPIRY_SWEEP_INTERVAL_MS ?? '60000');
+const sweepIntervalMs = Number(process.env.EXPIRY_SWEEP_INTERVAL_MS ?? '10000');
 
 async function runSweep() {
   const released = await releaseExpiredReservations(new Date().toISOString());

@@ -13,18 +13,38 @@ export function PaymentConfirmationModal({ purchase, onClose }: Props) {
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="payment-confirmation-title" style={backdrop}>
       <div style={modal}>
-        <h2 id="payment-confirmation-title" style={title}>
-          Payment confirmed.
-        </h2>
+        <span style={successPill}>Payment confirmed</span>
 
-        <div style={summaryCard}>
-          <p style={itemName}>{purchase.itemName}</p>
-          <p style={itemMeta}>{price === null ? 'Price unavailable' : formatUsd(price)}</p>
-          <p style={itemMeta}>Reservation {purchase.reservationId}</p>
-          <p style={itemMeta}>Paid at {formatDateTime(purchase.purchasedAt)}</p>
+        <div style={modalHead}>
+          <h2 id="payment-confirmation-title" style={modalTitle}>
+            Payment confirmed.
+          </h2>
+          <p style={modalCopy}>This item has been paid successfully. Close to return to checkout.</p>
         </div>
 
-        <div style={actions}>
+        <div style={itemCard}>
+          <div style={inlineRow}>
+            <span style={itemNameStyle}>{purchase.itemName}</span>
+            <span style={itemPriceStyle}>{price === null ? 'Price unavailable' : formatUsd(price)}</span>
+          </div>
+          <div style={inlineRow}>
+            <span style={saleWindowPill}>{purchase.saleId}</span>
+            <span style={mutedText}>Payment ID `{purchase.reservationId}`</span>
+          </div>
+        </div>
+
+        <div style={summaryGrid}>
+          <div style={summaryCard}>
+            <span style={summaryLabel}>Paid at</span>
+            <span style={summaryValue}>{formatDateTime(purchase.purchasedAt)}</span>
+          </div>
+          <div style={summaryCard}>
+            <span style={summaryLabel}>Status</span>
+            <span style={summaryValue}>Successful</span>
+          </div>
+        </div>
+
+        <div style={modalActions}>
           <button style={closeButton} onClick={onClose}>
             Close
           </button>
@@ -48,52 +68,155 @@ const backdrop: CSSProperties = {
   inset: 0,
   display: 'grid',
   placeItems: 'center',
-  padding: '1rem',
-  background: 'rgba(11,25,45,0.45)',
+  background: 'rgba(15,23,42,.32)',
+  padding: '24px',
   zIndex: 20
 };
 
 const modal: CSSProperties = {
-  width: 'min(100%, 28rem)',
+  width: 'min(100%, 560px)',
   display: 'grid',
-  gap: '0.9rem',
-  padding: '1rem',
-  borderRadius: '1rem',
-  background: '#ffffff',
-  border: '1px solid #bbf7d0',
-  boxShadow: '0 24px 48px rgba(11,25,45,0.22)'
+  gap: '16px',
+  padding: '24px',
+  borderRadius: '24px',
+  background: '#fff',
+  border: '1px solid rgba(95,111,255,.18)',
+  boxShadow: '0 24px 80px rgba(15,23,42,.22)'
 };
 
-const title: CSSProperties = {
-  margin: 0,
-  fontSize: '1.2rem',
+const successPill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 'max-content',
+  minHeight: '30px',
+  padding: '0 12px',
+  borderRadius: '999px',
+  background: '#dcfce7',
+  color: '#166534',
+  fontSize: '11px',
   fontWeight: 700,
-  color: '#166534'
+  letterSpacing: '.08em',
+  textTransform: 'uppercase'
+};
+
+const modalHead: CSSProperties = {
+  display: 'grid',
+  gap: '8px'
+};
+
+const modalTitle: CSSProperties = {
+  margin: 0,
+  fontSize: '30px',
+  lineHeight: 0.98,
+  color: '#101828'
+};
+
+const modalCopy: CSSProperties = {
+  margin: 0,
+  fontSize: '15px',
+  lineHeight: 1.5,
+  color: '#667085'
+};
+
+const itemCard: CSSProperties = {
+  display: 'grid',
+  gap: '10px',
+  padding: '16px',
+  borderRadius: '18px',
+  background: '#f8faff',
+  border: '1px solid rgba(95,111,255,.10)'
+};
+
+const inlineRow: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '12px',
+  flexWrap: 'wrap'
+};
+
+const itemNameStyle: CSSProperties = {
+  fontSize: '20px',
+  fontWeight: 700,
+  color: '#101828'
+};
+
+const itemPriceStyle: CSSProperties = {
+  fontSize: '22px',
+  fontWeight: 800,
+  color: '#101828',
+  textAlign: 'right',
+  whiteSpace: 'nowrap'
+};
+
+const saleWindowPill: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: '28px',
+  padding: '0 12px',
+  borderRadius: '999px',
+  background: '#f8fafc',
+  color: '#475467',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  border: '1px solid rgba(15,23,42,.08)'
+};
+
+const mutedText: CSSProperties = {
+  fontSize: '12px',
+  color: '#667085'
+};
+
+const summaryGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: '12px'
 };
 
 const summaryCard: CSSProperties = {
   display: 'grid',
-  gap: '0.25rem',
-  padding: '0.85rem',
-  borderRadius: '0.85rem',
-  background: '#f0fdf4',
-  border: '1px solid #bbf7d0'
+  gap: '6px',
+  padding: '14px',
+  borderRadius: '16px',
+  background: '#fff',
+  border: '1px solid rgba(95,111,255,.12)'
 };
 
-const itemName: CSSProperties = { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0b192d' };
-const itemMeta: CSSProperties = { margin: 0, fontSize: '0.82rem', color: '#166534' };
+const summaryLabel: CSSProperties = {
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  color: '#667085'
+};
 
-const actions: CSSProperties = {
+const summaryValue: CSSProperties = {
+  fontSize: '16px',
+  fontWeight: 700,
+  color: '#101828'
+};
+
+const modalActions: CSSProperties = {
   display: 'flex',
-  justifyContent: 'flex-end'
+  justifyContent: 'flex-end',
+  gap: '10px',
+  flexWrap: 'wrap'
 };
 
 const closeButton: CSSProperties = {
-  border: 'none',
-  borderRadius: '0.55rem',
-  padding: '0.7rem 1rem',
-  background: '#16a34a',
-  color: '#ffffff',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: '12px',
+  padding: '10px 14px',
   fontWeight: 700,
+  fontSize: '13px',
+  border: '1px solid #c7d2fe',
+  background: '#fff',
+  color: '#5f6fff',
   cursor: 'pointer'
 };

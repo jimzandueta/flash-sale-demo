@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { getReservationRecord, resetReservationsTable } from './helpers/localAws';
 import {
   handleDurableEvent,
@@ -6,7 +7,7 @@ import {
 } from '../../services/lambdas/reservation-worker/src/worker';
 
 describe('reservation worker', () => {
-  const tableName = 'flash-sale-reservations-local';
+  const tableName = `flash-sale-reservations-local-${randomUUID()}`;
 
   beforeEach(async () => {
     process.env.AWS_REGION = 'us-east-1';
@@ -107,6 +108,83 @@ describe('reservation worker', () => {
       status: 'EXPIRED',
       expiryEventId: 'evt_expired_1',
       updatedAt: '2026-05-05T05:16:00.000Z'
+    });
+  });
+
+  it('persists reservation-cancelled events through the dispatcher', async () => {
+    const reservationId = 'res_cancel_worker';
+
+    await handleDurableEvent({
+      eventType: 'reservation-created',
+      eventId: 'evt_cancel_create',
+      occurredAt: '2026-05-05T05:10:00.000Z',
+      reservationId,
+      saleId: 'sale_sneaker_003',
+      userToken: 'usr_tok_3',
+      expiresAt: '2026-05-05T05:15:00.000Z'
+    });
+
+    const cancelResult = await handleWorkerMessage(
+      JSON.stringify({
+        eventType: 'reservation-cancelled',
+        eventId: 'evt_cancel_worker_1',
+        occurredAt: '2026-05-05T05:11:00.000Z',
+        reservationId,
+        saleId: 'sale_sneaker_003',
+        userToken: 'usr_tok_3'
+      })
+    );
+
+    expect(cancelResult.persisted).toBe(true);
+    expect(await getReservationRecord(tableName, reservationId)).toMatchObject({
+      reservationId,
+      status: 'CANCELLED',
+      cancellationEventId: 'evt_cancel_worker_1',
+      updatedAt: '2026-05-05T05:11:00.000Z'
+    });
+  });
+
+  it('does not downgrade a PURCHASED reservation when a cancellation worker message arrives later', async () => {
+    const reservationId = 'res_cancel_after_purchase_worker';
+
+    await handleDurableEvent({
+      eventType: 'reservation-created',
+      eventId: 'evt_cancel_after_purchase_create',
+      occurredAt: '2026-05-05T05:10:00.000Z',
+      reservationId,
+      saleId: 'sale_sneaker_004',
+      userToken: 'usr_tok_4',
+      expiresAt: '2026-05-05T05:15:00.000Z'
+    });
+
+    await handleWorkerMessage(
+      JSON.stringify({
+        eventType: 'purchase-completed',
+        eventId: 'evt_cancel_after_purchase_complete',
+        occurredAt: '2026-05-05T05:12:00.000Z',
+        reservationId,
+        saleId: 'sale_sneaker_004',
+        userToken: 'usr_tok_4',
+        purchasedAt: '2026-05-05T05:12:00.000Z'
+      })
+    );
+
+    const cancelResult = await handleWorkerMessage(
+      JSON.stringify({
+        eventType: 'reservation-cancelled',
+        eventId: 'evt_cancel_after_purchase_cancel',
+        occurredAt: '2026-05-05T05:13:00.000Z',
+        reservationId,
+        saleId: 'sale_sneaker_004',
+        userToken: 'usr_tok_4'
+      })
+    );
+
+    expect(cancelResult.persisted).toBe(false);
+    expect(await getReservationRecord(tableName, reservationId)).toMatchObject({
+      reservationId,
+      status: 'PURCHASED',
+      purchaseEventId: 'evt_cancel_after_purchase_complete'
     });
   });
 

@@ -13,7 +13,7 @@ Flash Sale Platform is a thin React storefront backed by Fastify handlers, Redis
 7. If Redis is mapped to another host port, run `REDIS_URL=redis://127.0.0.1:<port> npm run test:integration`.
 8. Run `npm run stress` to execute the k6 reservation spike harness.
 
-Host ports can be overridden in `.env.example` through `REDIS_HOST_PORT`, `DYNAMODB_HOST_PORT`, `LOCALSTACK_HOST_PORT`, `API_HOST_PORT`, and `FRONTEND_HOST_PORT`.
+Compose reads the root `.env` file for local overrides. Host ports can be changed there through `REDIS_HOST_PORT`, `DYNAMODB_HOST_PORT`, `LOCALSTACK_HOST_PORT`, `API_HOST_PORT`, and `FRONTEND_HOST_PORT`.
 
 ## Architecture
 

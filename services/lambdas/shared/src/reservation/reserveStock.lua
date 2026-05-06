@@ -10,6 +10,8 @@ local ttlSeconds = tonumber(ARGV[3])
 local saleId = ARGV[4]
 local userToken = ARGV[5]
 local idempotencyEnabled = ARGV[6]
+local reservationGraceSeconds = tonumber(ARGV[7])
+local reservationRecordTtlSeconds = ttlSeconds + reservationGraceSeconds
 
 if idempotencyEnabled == '1' and redis.call('EXISTS', idempotencyKey) == 1 then
   local replayedReservation = redis.call('HMGET', idempotencyKey, 'reservationId', 'remainingStock', 'expiresAt')
@@ -29,7 +31,7 @@ remaining = redis.call('DECR', stockKey)
 redis.call('SET', saleUserKey, reservationId, 'EX', ttlSeconds)
 redis.call('SADD', userReservationsKey, reservationId)
 redis.call('HSET', reservationKey, 'saleId', saleId, 'userToken', userToken, 'status', 'RESERVED', 'expiresAt', expiresAt, 'remainingStock', tostring(remaining))
-redis.call('EXPIRE', reservationKey, ttlSeconds)
+redis.call('EXPIRE', reservationKey, reservationRecordTtlSeconds)
 if idempotencyEnabled == '1' then
   redis.call('HSET', idempotencyKey, 'reservationId', reservationId, 'remainingStock', tostring(remaining), 'expiresAt', expiresAt)
   redis.call('EXPIRE', idempotencyKey, ttlSeconds)

@@ -1,9 +1,9 @@
 const STOREFRONT_ITEM_PRICES: Record<string, number> = {
-  'Bookipi Cap': 42,
+  'KooPiBi Cap': 42,
   'Founder Tee': 48,
-  'Bookipi Tote': 36,
-  'Bookipi Hoodie': 64,
-  'Bookipi Poster': 18,
+  'KooPiBi Tote': 36,
+  'KooPiBi Hoodie': 64,
+  'KooPiBi Poster': 18,
   'Limited Sneaker': 88,
   'Track Jacket': 72,
   'Collector Cap': 38,

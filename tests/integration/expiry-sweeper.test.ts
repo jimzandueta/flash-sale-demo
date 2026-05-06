@@ -24,6 +24,50 @@ describe('expiry sweeper', () => {
     await redis.quit();
   });
 
+  it('still releases stock and publishes expiry after the original hold ttl has elapsed', async () => {
+    const originalTtl = process.env.DEFAULT_RESERVATION_TTL_SECONDS;
+    process.env.DEFAULT_RESERVATION_TTL_SECONDS = '1';
+
+    const app = await buildServer();
+
+    try {
+      const reserveResponse = await app.inject({
+        method: 'POST',
+        url: '/sales/sale_jacket_002/reservations',
+        headers: { 'x-user-token': 'usr_tok_late_expiry', 'idempotency-key': 'late_expiry_1' }
+      });
+
+      expect(reserveResponse.statusCode).toBe(200);
+      const reservationId = reserveResponse.json().reservationId as string;
+
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+      expect(await releaseExpiredReservations(new Date().toISOString())).toBe(1);
+      expect(await redis.get('sale:sale_jacket_002:stock')).toBe('5');
+      expect(await redis.hget(`reservation:${reservationId}`, 'status')).toBe('EXPIRED');
+
+      const message = await receiveSingleMessage(expiryQueueUrl);
+
+      expect(message?.Body ? JSON.parse(message.Body) : null).toEqual({
+        eventType: 'reservation-expired',
+        eventId: `expiry:${reservationId}`,
+        occurredAt: expect.any(String),
+        reservationId,
+        saleId: 'sale_jacket_002',
+        userToken: 'usr_tok_late_expiry',
+        expiresAt: expect.any(String)
+      });
+    } finally {
+      await app.close();
+
+      if (originalTtl === undefined) {
+        delete process.env.DEFAULT_RESERVATION_TTL_SECONDS;
+      } else {
+        process.env.DEFAULT_RESERVATION_TTL_SECONDS = originalTtl;
+      }
+    }
+  });
+
   it('releases an expired reservation back to stock exactly once', async () => {
     const app = await buildServer();
 

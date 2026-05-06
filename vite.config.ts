@@ -8,6 +8,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
+      '/debug': 'http://api:3000',
       '/sessions': 'http://api:3000',
       '/sales': 'http://api:3000',
       '/reservations': 'http://api:3000'

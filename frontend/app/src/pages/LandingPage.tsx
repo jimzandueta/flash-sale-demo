@@ -1,281 +1,355 @@
-import type { CSSProperties } from 'react';
-import type { SessionResponse } from '../api/client';
+import type { CSSProperties, FormEvent, ReactNode } from 'react';
+import type { SaleItem, SessionResponse } from '../api/client';
 import { PageShell } from '../components/PageShell';
-import { formatUsd, priceForItem } from '../storefrontPricing';
+import { priceForItem, storefrontPrice } from '../storefrontPricing';
+import { storefrontMeta } from '../storefrontCatalog';
+import { formatWindow } from '../dateUtils';
 import type { Notice } from '../types';
 
 type Props = {
   session: SessionResponse | null;
   notice: Notice | null;
+  sales: SaleItem[];
   draftDisplayName: string;
+  draftEmailAddress: string;
   isCreatingSession: boolean;
+  dock?: ReactNode;
   onDisplayNameChange: (value: string) => void;
+  onEmailAddressChange: (value: string) => void;
   onSubmit: () => void;
 };
 
 export function LandingPage({
   session,
   notice,
+  sales,
   draftDisplayName,
+  draftEmailAddress,
   isCreatingSession,
+  dock,
   onDisplayNameChange,
+  onEmailAddressChange,
   onSubmit
 }: Props) {
+  const activeSales = sales.filter((sale) => sale.status === 'active');
+  const isSubmitDisabled =
+    isCreatingSession || draftDisplayName.trim().length === 0 || draftEmailAddress.trim().length === 0;
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSubmit();
+  }
+
   return (
     <PageShell
-      page="landing"
-      title="Flash Sale"
-      description="Limited drops with short windows and per-item checkout."
-      session={session}
+      header={{
+        eyebrow: 'KooPiBi / Flash Sale',
+        headline: 'Limited drops. Short windows. Shop the sale before it is gone.'
+      }}
       notice={notice}
+      dock={dock}
     >
       <section style={landingGrid}>
-        <section style={dropBoard}>
-          <div style={boardHeader}>
-            <span style={heroBadge}>Today only</span>
-            <h2 style={landingHeadline}>Flash Sale</h2>
-            <p style={landingBody}>
-              Limited drops open in short windows with fast per-item checkout. Preview the board
-              before the next release window opens.
-            </p>
+        <div style={heroCard}>
+          <div style={landingBand}>
+            <span style={dropKicker}>Spring drop live now</span>
+            <h2 style={heroTitle}>Flash Sale</h2>
+            <p style={heroBody}>Limited-run KooPiBi pieces with short sale windows and high-demand inventory.</p>
           </div>
 
-          <div style={previewList}>
-            {previewItems.map((item) => (
-              <article key={item.name} style={previewCard}>
-                <div style={previewCardHeader}>
-                  <p style={previewName}>{item.name}</p>
-                  <p style={previewPrice}>{formatUsd(priceForItem(item.name))}</p>
+          <div style={dropGrid}>
+            {activeSales.length > 0 ? (
+              activeSales.map((sale) => (
+                <div key={sale.saleId} style={dropTile}>
+                  <div style={dropTagRow}>
+                    <span style={dropStatus()}>Live</span>
+                    <span style={dropWindow}>{formatWindow(sale.startsAt, sale.endsAt)}</span>
+                  </div>
+
+                  <div style={dropBody}>
+                    <div aria-hidden="true" style={{ ...dropArt, background: storefrontMeta(sale.itemName).gradient }} />
+                    <div style={dropCopy}>
+                      <div style={dropNameRow}>
+                        <span style={dropName}>{sale.itemName}</span>
+                        <span style={dropPrice}>{formatLandingPrice(sale)}</span>
+                      </div>
+                      <span style={dropMeta}>{productCopy(sale.itemName)}</span>
+                    </div>
+                  </div>
                 </div>
-                <p style={previewWindowLabel}>Window</p>
-                <p style={previewWindowValue}>{item.window}</p>
-                <p style={previewBlurb}>{item.blurb}</p>
-              </article>
-            ))}
+              ))
+            ) : (
+              <div style={emptyLandingState}>
+                <span style={emptyLandingTitle}>No active drops right now.</span>
+                <span style={emptyLandingCopy}>Check back soon for the next live sale window.</span>
+              </div>
+            )}
           </div>
-        </section>
+        </div>
 
-        <form
-          style={joinCard}
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSubmit();
-          }}
-        >
-          <div style={joinHeader}>
-            <p style={joinEyebrow}>Priority access</p>
-            <h2 style={joinTitle}>Join the flash sale</h2>
-            <p style={joinBody}>Enter your name to unlock the live drop list.</p>
+        <form style={landingPanel} onSubmit={handleSubmit}>
+          <div style={landingJoinCopy}>
+            <span style={joinTitle}>Join the flash sale</span>
+            <span style={landingHelper}>
+              Enter now to shop the current drop before the window closes. Supply your name and email address.
+            </span>
           </div>
 
-          <label htmlFor="display-name" style={visuallyHidden}>Name</label>
-          <input
-            id="display-name"
-            name="display-name"
-            value={draftDisplayName}
-            onChange={(event) => onDisplayNameChange(event.target.value)}
-            placeholder="Name"
-            style={fieldInput}
-            disabled={isCreatingSession}
-          />
+          <div style={landingFields}>
+            <label htmlFor="display-name" style={visuallyHidden}>Name</label>
+            <input
+              id="display-name"
+              name="display-name"
+              value={draftDisplayName}
+              onChange={(event) => onDisplayNameChange(event.target.value)}
+              placeholder="Name"
+              style={landingInput}
+              disabled={isCreatingSession}
+            />
 
-          <label htmlFor="email-address" style={visuallyHidden}>Email Address</label>
-          <input
-            id="email-address"
-            name="email-address"
-            type="email"
-            placeholder="Email Address"
-            style={fieldInput}
-            disabled
-          />
+            <label htmlFor="email-address" style={visuallyHidden}>Email Address</label>
+            <input
+              id="email-address"
+              name="email-address"
+              type="email"
+              value={draftEmailAddress}
+              onChange={(event) => onEmailAddressChange(event.target.value)}
+              placeholder="Email"
+              style={landingInput}
+              disabled={isCreatingSession}
+            />
+          </div>
 
-          <button
-            type="submit"
-            style={primaryButton}
-            disabled={isCreatingSession || draftDisplayName.trim().length === 0}
-          >
-            {isCreatingSession ? 'Opening the sale...' : 'Enter the sale'}
-          </button>
-
-          <p style={helperText}>Use any shopper name to enter the sale floor.</p>
+          <div style={buttonRow}>
+            <button
+              type="submit"
+              style={landingButtonStyle(isSubmitDisabled)}
+              disabled={isSubmitDisabled}
+            >
+              {isCreatingSession ? 'Opening the sale...' : 'Enter the sale'}
+            </button>
+          </div>
         </form>
       </section>
     </PageShell>
   );
 }
 
-const previewItems = [
-  {
-    name: 'Founder Tee',
-    window: '2:00 PM - 2:30 PM',
-    blurb: 'Signature release with limited stock.'
-  },
-  {
-    name: 'Bookipi Cap',
-    window: '2:00 PM - 2:30 PM',
-    blurb: 'Lightweight staple for the first wave.'
-  },
-  {
-    name: 'Bookipi Hoodie',
-    window: '2:40 PM - 3:00 PM',
-    blurb: 'Heavy fleece layer for the late drop.'
-  },
-  {
-    name: 'Bookipi Tote',
-    window: '2:05 PM - 2:25 PM',
-    blurb: 'Carry-all canvas piece for quick checkouts.'
-  }
-] as const;
+function formatLandingPrice(sale: SaleItem) {
+  const price = storefrontPrice(sale.itemName, sale.price);
+  return price === null ? 'Price unavailable' : `$${price}`;
+}
+
+function productCopy(itemName: string) {
+  if (itemName === 'KooPiBi Cap') return 'Embroidered cap in the current drop.';
+  if (itemName === 'Founder Tee') return 'Heavyweight tee from the founder collection.';
+  if (itemName === 'KooPiBi Tote') return 'Everyday canvas tote with limited stock.';
+  if (itemName === 'KooPiBi Hoodie') return 'Midweight fleece hoodie in the next release.';
+  return 'Limited-run item from the flash sale.';
+}
 
 const landingGrid: CSSProperties = {
   display: 'grid',
-  gap: '1rem',
-  gridTemplateColumns: 'minmax(0, 1.25fr) minmax(280px, 360px)',
-  alignItems: 'stretch'
+  gap: '16px',
+  gridTemplateColumns: '1.05fr 0.95fr'
 };
 
-const dropBoard: CSSProperties = {
+const heroCard: CSSProperties = {
+  background: 'linear-gradient(145deg, #101828 0%, #1d2939 55%, #374151 100%)',
+  color: '#ffffff',
+  borderRadius: '18px',
+  padding: '18px',
   display: 'grid',
-  gap: '1rem',
-  padding: '1rem',
-  borderRadius: '0.95rem',
-  border: '1px solid rgba(9,90,233,0.12)',
-  background: 'linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%)',
-  boxShadow: '0 1px 6px rgba(9,90,233,0.06)'
+  gap: '12px'
 };
 
-const boardHeader: CSSProperties = {
+const landingBand: CSSProperties = {
   display: 'grid',
-  gap: '0.7rem',
-  alignContent: 'start'
+  gap: '6px'
 };
 
-const heroBadge: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  alignSelf: 'start',
-  padding: '0.4rem 0.75rem',
-  borderRadius: '999px',
-  border: '1px solid rgba(9,90,233,0.18)',
-  background: '#e0f0ff',
-  color: '#095ae9',
-  fontSize: '0.7rem',
+const dropKicker: CSSProperties = {
+  fontSize: '11px',
   fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase'
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#c7d2fe'
 };
 
-const landingHeadline: CSSProperties = {
+const heroTitle: CSSProperties = {
   margin: 0,
-  fontSize: 'clamp(1.95rem, 4vw, 2.85rem)',
-  lineHeight: 0.98,
+  fontSize: '40px',
+  lineHeight: 0.95
+};
+
+const heroBody: CSSProperties = {
+  margin: 0,
+  color: '#d0d5dd',
+  fontSize: '15px',
+  lineHeight: 1.4,
+  maxWidth: '34rem'
+};
+
+const dropGrid: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: '12px'
+};
+
+const emptyLandingState: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  padding: '18px',
+  borderRadius: '16px',
+  background: 'rgba(255,255,255,0.07)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  minHeight: '132px',
+  alignContent: 'center',
+  gridColumn: '1 / -1'
+};
+
+const emptyLandingTitle: CSSProperties = {
+  fontSize: '20px',
+  lineHeight: 1.1,
   fontWeight: 700,
-  color: '#0b192d'
+  color: '#ffffff'
 };
 
-const landingBody: CSSProperties = {
-  margin: 0,
-  maxWidth: '38rem',
-  lineHeight: 1.6,
-  color: '#374151',
-  fontSize: '0.95rem'
+const emptyLandingCopy: CSSProperties = {
+  color: '#cbd5e1',
+  fontSize: '13px',
+  lineHeight: 1.45
 };
 
-const previewList: CSSProperties = {
+const dropTile: CSSProperties = {
   display: 'grid',
-  gap: '0.75rem',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))'
+  gap: '10px',
+  padding: '14px',
+  borderRadius: '16px',
+  background: 'rgba(255,255,255,0.07)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  minHeight: '132px'
 };
 
-const previewCard: CSSProperties = {
-  display: 'grid',
-  gap: '0.45rem',
-  padding: '0.85rem 0.9rem',
-  borderRadius: '0.85rem',
-  border: '1px solid rgba(11,25,45,0.08)',
-  background: '#ffffff'
-};
-
-const previewCardHeader: CSSProperties = {
+const dropTagRow: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
+  gap: '10px',
+  alignItems: 'center',
+  flexWrap: 'wrap'
+};
+
+function dropStatus(color?: string): CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    fontSize: '11px',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: color ?? '#d1fae5'
+  };
+}
+
+const dropWindow: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  fontSize: '11px',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#c7d2fe'
+};
+
+const dropBody: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '68px minmax(0, 1fr)',
+  gap: '12px',
+  alignItems: 'center'
+};
+
+const dropArt: CSSProperties = {
+  width: '68px',
+  aspectRatio: '1 / 1',
+  borderRadius: '14px',
+  border: '1px solid rgba(255,255,255,0.10)'
+};
+
+const dropCopy: CSSProperties = {
+  display: 'grid',
+  gap: '6px',
+  alignContent: 'center'
+};
+
+const dropNameRow: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: '8px',
   alignItems: 'baseline',
-  gap: '0.75rem'
+  flexWrap: 'wrap'
 };
 
-const previewName: CSSProperties = {
-  margin: 0,
-  fontSize: '1rem',
+const dropName: CSSProperties = {
+  fontSize: '24px',
+  lineHeight: 1,
   fontWeight: 700,
-  color: '#0b192d'
+  color: '#ffffff'
 };
 
-const previewPrice: CSSProperties = {
-  margin: 0,
-  fontSize: '0.95rem',
+const dropPrice: CSSProperties = {
+  fontSize: '14px',
+  lineHeight: 1.2,
   fontWeight: 700,
-  color: '#095ae9'
+  color: '#ffffff'
 };
 
-const previewWindowLabel: CSSProperties = {
-  margin: 0,
-  fontSize: '0.68rem',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: '#6b7280'
+const dropMeta: CSSProperties = {
+  color: '#cbd5e1',
+  fontSize: '13px',
+  lineHeight: 1.45
 };
 
-const previewWindowValue: CSSProperties = {
-  margin: 0,
-  fontSize: '0.9rem',
-  color: '#374151'
-};
-
-const previewBlurb: CSSProperties = {
-  margin: 0,
-  fontSize: '0.86rem',
-  lineHeight: 1.45,
-  color: '#6b7280'
-};
-
-const joinCard: CSSProperties = {
-  display: 'grid',
-  gap: '0.9rem',
+const landingPanel: CSSProperties = {
   alignContent: 'start',
-  padding: '1rem',
-  borderRadius: '0.95rem',
-  background: '#ffffff',
-  border: '1px solid #e5e7eb',
-  boxShadow: '0 1px 6px rgba(9,90,233,0.06)'
-};
-
-const joinHeader: CSSProperties = {
   display: 'grid',
-  gap: '0.4rem'
+  gap: '16px',
+  position: 'relative',
+  overflow: 'hidden',
+  background: 'linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%)',
+  border: '2px solid rgba(95, 111, 255, 0.32)',
+  boxShadow: '0 24px 48px rgba(95, 111, 255, 0.16)',
+  borderRadius: '18px',
+  padding: '18px'
 };
 
-const joinEyebrow: CSSProperties = {
-  margin: 0,
-  fontSize: '0.7rem',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: '#095ae9'
+const landingJoinCopy: CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  display: 'grid',
+  gap: '10px'
 };
 
 const joinTitle: CSSProperties = {
-  margin: 0,
-  fontSize: '1.35rem',
-  lineHeight: 1.1,
-  color: '#0b192d'
+  fontSize: '28px',
+  fontWeight: 700,
+  color: '#111827',
+  lineHeight: 1,
+  whiteSpace: 'nowrap'
 };
 
-const joinBody: CSSProperties = {
-  margin: 0,
-  fontSize: '0.9rem',
-  lineHeight: 1.5,
-  color: '#6b7280'
+const landingHelper: CSSProperties = {
+  color: '#667085',
+  fontSize: '12px',
+  lineHeight: 1.35,
+  position: 'relative',
+  zIndex: 1
+};
+
+const landingFields: CSSProperties = {
+  display: 'grid',
+  gap: '8px',
+  position: 'relative',
+  zIndex: 1
 };
 
 const visuallyHidden: CSSProperties = {
@@ -290,31 +364,47 @@ const visuallyHidden: CSSProperties = {
   border: 0
 };
 
-const fieldInput: CSSProperties = {
-  width: '100%',
-  padding: '0.95rem 1rem',
-  borderRadius: '0.5rem',
-  border: '1px solid #e5e7eb',
+const landingInput: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  minHeight: '54px',
+  borderRadius: '14px',
+  border: '1px solid rgba(95,111,255,0.18)',
   background: '#ffffff',
-  fontSize: '1rem',
-  color: '#0b192d',
-  boxSizing: 'border-box'
+  padding: '0 14px',
+  color: '#101828',
+  fontWeight: 500,
+  position: 'relative',
+  zIndex: 1,
+  boxSizing: 'border-box',
+  width: '100%'
 };
 
-const helperText: CSSProperties = {
-  margin: 0,
-  fontSize: '0.82rem',
-  color: '#6b7280',
-  lineHeight: 1.5
+const buttonRow: CSSProperties = {
+  display: 'grid',
+  position: 'relative',
+  zIndex: 1
 };
 
-const primaryButton: CSSProperties = {
-  border: 'none',
-  borderRadius: '0.5rem',
-  padding: '0.75rem 1rem',
-  fontWeight: 700,
-  fontSize: '0.88rem',
-  cursor: 'pointer',
-  background: '#095ae9',
-  color: '#ffffff'
-};
+function landingButtonStyle(isDisabled: boolean): CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    minHeight: '48px',
+    borderRadius: '12px',
+    background: isDisabled
+      ? 'linear-gradient(180deg, #c7d2fe 0%, #a5b4fc 100%)'
+      : 'linear-gradient(180deg, #6f7cff 0%, #5f6fff 100%)',
+    color: 'rgba(255,255,255,0.92)',
+    fontWeight: 700,
+    fontSize: '13px',
+    opacity: isDisabled ? 0.75 : 1,
+    boxShadow: isDisabled
+      ? 'inset 0 1px 0 rgba(255,255,255,0.28)'
+      : '0 8px 18px rgba(95,111,255,0.28)',
+    border: 'none',
+    cursor: isDisabled ? 'not-allowed' : 'pointer'
+  };
+}

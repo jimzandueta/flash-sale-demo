@@ -88,6 +88,7 @@ export async function cancelReservation(
   redis: Redis,
   input: { reservationId: string; userToken: string }
 ) {
+  const reservation = await getReservationById(redis, input.reservationId);
   const result = (await redis.eval(
     cancelScript,
     1,
@@ -95,8 +96,18 @@ export async function cancelReservation(
     input.userToken,
     input.reservationId
   )) as string[];
+  const status = result[0] as 'CANCELLED' | 'NOT_FOUND' | 'FORBIDDEN' | 'ALREADY_PURCHASED';
+
+  if (status === 'CANCELLED') {
+    await publishEvent('reservation-cancelled', {
+      reservationId: input.reservationId,
+      saleId: reservation?.saleId ?? 'unknown-sale',
+      userToken: input.userToken,
+      occurredAt: new Date().toISOString()
+    });
+  }
 
   return {
-    status: result[0] as 'CANCELLED' | 'NOT_FOUND' | 'FORBIDDEN' | 'ALREADY_PURCHASED'
+    status
   };
 }

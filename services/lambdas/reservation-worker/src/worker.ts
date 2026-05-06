@@ -4,6 +4,7 @@ import type {
   DurableEventPayloadByType
 } from '../../shared/src/events/types';
 import {
+  putCancellationRecord,
   putExpiryRecord,
   putPurchaseRecord,
   putReservationRecord
@@ -37,6 +38,14 @@ export async function handleReservationExpired(
   return putExpiryRecord({ eventType: 'reservation-expired', ...event });
 }
 
+export async function handleReservationCancelled(
+  event: DurableEventPayloadByType['reservation-cancelled']
+) {
+  logger.debug('reservation-worker persisting', event);
+
+  return putCancellationRecord({ eventType: 'reservation-cancelled', ...event });
+}
+
 export async function handleDurableEvent(event: DurableEvent) {
   const eventType = event.eventType;
 
@@ -47,6 +56,8 @@ export async function handleDurableEvent(event: DurableEvent) {
       return handlePurchaseCompleted(event);
     case 'reservation-expired':
       return handleReservationExpired(event);
+    case 'reservation-cancelled':
+      return handleReservationCancelled(event);
     default:
       return assertUnhandledEventType(eventType as never);
   }
