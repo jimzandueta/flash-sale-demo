@@ -27,13 +27,15 @@ export default function App() {
   const [cart, setCart] = useState<CartReservation[]>([]);
   const [purchases, setPurchases] = useState<PurchaseSummary[]>([]);
   const [purchasedSaleIds, setPurchasedSaleIds] = useState<Set<string>>(new Set());
+  const [activePaymentReservationId, setActivePaymentReservationId] = useState<string | null>(null);
+  const [paymentConfirmationReservationId, setPaymentConfirmationReservationId] = useState<string | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
   const [isReserving, setIsReserving] = useState(false);
   const [isCheckingOutIds, setIsCheckingOutIds] = useState<Set<string>>(new Set());
   const [isCancellingIds, setIsCancellingIds] = useState<Set<string>>(new Set());
   const [simulateFailureIds, setSimulateFailureIds] = useState<Set<string>>(new Set());
-  const [checkoutErrors, setCheckoutErrors] = useState<Record<string, string>>({});
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const navigate = useNavigate();
@@ -43,6 +45,9 @@ export default function App() {
   const page = routeMatch?.page ?? null;
   const routeSaleId = routeMatch?.page === 'product-page' ? routeMatch.saleId : null;
   const selectedSale = sales.find((sale) => sale.saleId === (routeSaleId ?? selectedSaleId)) ?? null;
+  const activePaymentItem = cart.find((item) => item.reservationId === activePaymentReservationId) ?? null;
+  const paymentConfirmationPurchase =
+    purchases.find((purchase) => purchase.reservationId === paymentConfirmationReservationId) ?? null;
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -123,8 +128,10 @@ export default function App() {
       setCart([]);
       setPurchases([]);
       setPurchasedSaleIds(new Set());
+      setActivePaymentReservationId(null);
+      setPaymentConfirmationReservationId(null);
       setSimulateFailureIds(new Set());
-      setCheckoutErrors({});
+      setPaymentError(null);
       navigate('/products');
     } catch {
       setNotice({ tone: 'warning', text: 'Unable to create a session right now.' });
@@ -154,6 +161,7 @@ export default function App() {
           reservationId: result.reservationId,
           saleId: selectedSale.saleId,
           itemName: selectedSale.itemName,
+          price: selectedSale.price,
           expiresAt: result.expiresAt,
           remainingStock: result.remainingStock
         };
@@ -183,6 +191,7 @@ export default function App() {
               reservationId: existing.reservationId,
               saleId: selectedSale.saleId,
               itemName: selectedSale.itemName,
+              price: selectedSale.price,
               expiresAt: existing.expiresAt
             }
           ]);
@@ -223,17 +232,11 @@ export default function App() {
       const result = await cancelReservation(reservationId, session.userToken);
 
       if (result.status === 'CANCELLED' || result.status === 'NOT_FOUND') {
-        const nextCart = cart.filter((item) => item.reservationId !== reservationId);
-        setCart(nextCart);
+        setCart((current) => current.filter((item) => item.reservationId !== reservationId));
         setReservations((current) => current.filter((reservation) => reservation.reservationId !== reservationId));
-        setCheckoutErrors((current) => {
-          const next = { ...current };
-          delete next[reservationId];
-          return next;
-        });
-
-        if (page === 'checkout' && nextCart.length === 0) {
-          navigate('/products');
+        if (activePaymentReservationId === reservationId) {
+          setActivePaymentReservationId(null);
+          setPaymentError(null);
         }
         return;
       }
@@ -256,18 +259,32 @@ export default function App() {
     }
   }
 
-  async function handleBuyItem(reservationId: string) {
+  function handleOpenPayment(reservationId: string) {
+    setActivePaymentReservationId(reservationId);
+    setPaymentConfirmationReservationId(null);
+    setPaymentError(null);
+    setNotice(null);
+  }
+
+  function handleClosePayment() {
+    setActivePaymentReservationId(null);
+    setPaymentError(null);
+  }
+
+  function handleClosePaymentConfirmation() {
+    setPaymentConfirmationReservationId(null);
+  }
+
+  async function handleConfirmPayment() {
     if (!session) return;
-    const cartItem = cart.find((item) => item.reservationId === reservationId);
+    const cartItem = activePaymentItem;
     if (!cartItem) return;
+
+    const reservationId = cartItem.reservationId;
 
     setIsCheckingOutIds((current) => new Set([...current, reservationId]));
     setNotice(null);
-    setCheckoutErrors((current) => {
-      const next = { ...current };
-      delete next[reservationId];
-      return next;
-    });
+    setPaymentError(null);
 
     try {
       const result = await checkoutReservationRequest(
@@ -278,14 +295,13 @@ export default function App() {
       );
 
       if (result.status === 'PAYMENT_FAILED') {
-        setCheckoutErrors((current) => ({
-          ...current,
-          [reservationId]: `Payment failed for ${cartItem.itemName}. Your hold remains active.`
-        }));
+        setPaymentError(`Payment failed for ${cartItem.itemName}. Your hold remains active.`);
         return;
       }
 
       if (result.status === 'RESERVATION_EXPIRED') {
+        setActivePaymentReservationId(null);
+        setPaymentError(null);
         await refreshReservations();
         setNotice({
           tone: 'warning',
@@ -294,27 +310,28 @@ export default function App() {
         return;
       }
 
+      const nextPurchase: PurchaseSummary = {
+        reservationId,
+        saleId: cartItem.saleId,
+        itemName: cartItem.itemName,
+        price: cartItem.price,
+        purchasedAt: result.purchasedAt,
+        expiresAt: cartItem.expiresAt
+      };
+
       setCart((current) => current.filter((item) => item.reservationId !== reservationId));
       setReservations((current) => current.filter((reservation) => reservation.reservationId !== reservationId));
-      setPurchases((current) => [
-        ...current,
-        {
-          reservationId,
-          saleId: cartItem.saleId,
-          itemName: cartItem.itemName,
-          purchasedAt: result.purchasedAt,
-          expiresAt: cartItem.expiresAt
-        }
-      ]);
+      setPurchases((current) => [...current, nextPurchase]);
       setPurchasedSaleIds((current) => new Set([...current, cartItem.saleId]));
       setSimulateFailureIds((current) => {
         const next = new Set(current);
         next.delete(reservationId);
         return next;
       });
-      setNotice({ tone: 'success', text: `${cartItem.itemName} purchased successfully.` });
+      setActivePaymentReservationId(null);
+      setPaymentConfirmationReservationId(reservationId);
     } catch {
-      setNotice({ tone: 'warning', text: 'Unable to complete this purchase right now.' });
+      setPaymentError('Unable to complete this purchase right now.');
     } finally {
       setIsCheckingOutIds((current) => {
         const next = new Set(current);
@@ -351,7 +368,7 @@ export default function App() {
   if (!session && page !== 'landing') return <Navigate to="/" replace />;
   if (page === 'product-page' && !selectedSale && !isLoadingCatalog) return <Navigate to="/products" replace />;
   if (page === 'checkout' && cart.length === 0 && purchases.length === 0) return <Navigate to="/products" replace />;
-  if (page === 'confirmation' && purchases.length === 0) return <Navigate to="/products" replace />;
+  if (page === 'confirmation' && purchases.length === 0) return <Navigate to="/checkout" replace />;
 
   if (page === 'landing') {
     return (
@@ -406,30 +423,39 @@ export default function App() {
       <CheckoutPage
         session={session}
         notice={notice}
+        sales={sales}
         cart={cart}
         purchases={purchases}
-        checkoutErrors={checkoutErrors}
         now={now}
         isCheckingOutIds={isCheckingOutIds}
         isCancellingIds={isCancellingIds}
         simulateFailureIds={simulateFailureIds}
-        onBuyItem={(id) => void handleBuyItem(id)}
+        activePaymentItem={activePaymentItem}
+        paymentConfirmationPurchase={paymentConfirmationPurchase}
+        paymentError={paymentError}
+        onOpenPayment={handleOpenPayment}
+        onClosePayment={handleClosePayment}
+        onConfirmPayment={() => void handleConfirmPayment()}
+        onClosePaymentConfirmation={handleClosePaymentConfirmation}
         onRemoveFromCart={(id) => void handleRemoveFromCart(id)}
         onToggleSimulateFailure={handleToggleSimulateFailure}
-        onViewConfirmation={() => navigate('/confirmation')}
         onKeepShopping={() => navigate('/products')}
       />
     );
   }
 
-  return (
-    <ConfirmationPage
-      session={session}
-      notice={notice}
-      purchases={purchases}
-      onBack={handleBackToProducts}
-    />
-  );
+  if (page === 'confirmation') {
+    return (
+      <ConfirmationPage
+        session={session}
+        notice={notice}
+        purchases={purchases}
+        onBack={handleBackToProducts}
+      />
+    );
+  }
+
+  return <Navigate to={session ? '/products' : '/'} replace />;
 }
 
 function matchPage(pathname: string): { page: Page; saleId?: string } | null {
@@ -450,12 +476,13 @@ function deriveCartFromReservations(
 ): CartReservation[] {
   return reservations
     .filter((reservation) => reservation.status === 'RESERVED')
-    .map((reservation) => ({
-      reservationId: reservation.reservationId,
-      saleId: reservation.saleId,
-      itemName: sales.find((sale) => sale.saleId === reservation.saleId)?.itemName ?? reservation.saleId,
-      expiresAt: reservation.expiresAt
-    }));
+      .map((reservation) => ({
+        reservationId: reservation.reservationId,
+        saleId: reservation.saleId,
+        itemName: sales.find((sale) => sale.saleId === reservation.saleId)?.itemName ?? reservation.saleId,
+        price: sales.find((sale) => sale.saleId === reservation.saleId)?.price,
+        expiresAt: reservation.expiresAt
+      }));
 }
 
 function sortSales(items: SaleItem[]) {

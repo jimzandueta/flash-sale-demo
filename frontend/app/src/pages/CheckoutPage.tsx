@@ -1,46 +1,67 @@
-import type { CSSProperties } from 'react';
-import type { SessionResponse } from '../api/client';
+import { useEffect, useState, type CSSProperties } from 'react';
+import type { SaleItem, SessionResponse } from '../api/client';
 import { PageShell } from '../components/PageShell';
+import { PaymentConfirmationModal } from '../components/PaymentConfirmationModal';
+import { PaymentModal } from '../components/PaymentModal';
+import { formatUsd, storefrontPrice } from '../storefrontPricing';
 import type { CartReservation, Notice, PurchaseSummary } from '../types';
 
 type Props = {
   session: SessionResponse | null;
   notice: Notice | null;
+  sales: SaleItem[];
   cart: CartReservation[];
   purchases: PurchaseSummary[];
-  checkoutErrors: Record<string, string>;
   now: number;
   isCheckingOutIds: Set<string>;
   isCancellingIds: Set<string>;
   simulateFailureIds: Set<string>;
-  onBuyItem: (reservationId: string) => void;
+  activePaymentItem: CartReservation | null;
+  paymentConfirmationPurchase: PurchaseSummary | null;
+  paymentError: string | null;
+  onOpenPayment: (reservationId: string) => void;
+  onClosePayment: () => void;
+  onConfirmPayment: () => void;
+  onClosePaymentConfirmation: () => void;
   onRemoveFromCart: (reservationId: string) => void;
   onToggleSimulateFailure: (reservationId: string) => void;
-  onViewConfirmation: () => void;
   onKeepShopping: () => void;
 };
 
 export function CheckoutPage({
   session,
   notice,
+  sales,
   cart,
   purchases,
-  checkoutErrors,
   now,
   isCheckingOutIds,
   isCancellingIds,
   simulateFailureIds,
-  onBuyItem,
+  activePaymentItem,
+  paymentConfirmationPurchase,
+  paymentError,
+  onOpenPayment,
+  onClosePayment,
+  onConfirmPayment,
+  onClosePaymentConfirmation,
   onRemoveFromCart,
   onToggleSimulateFailure,
-  onViewConfirmation,
   onKeepShopping
 }: Props) {
+  const [selectedPurchase, setSelectedPurchase] = useState<PurchaseSummary | null>(null);
+  const salesById = new Map(sales.map((sale) => [sale.saleId, sale]));
   const rows = [
     ...purchases.map((purchase) => ({ kind: 'purchase' as const, sortAt: purchase.expiresAt, purchase })),
     ...cart.map((item) => ({ kind: 'cart' as const, sortAt: item.expiresAt, item }))
   ].sort((a, b) => Date.parse(a.sortAt) - Date.parse(b.sortAt));
-  const allDone = cart.length === 0 && purchases.length > 0;
+  const visiblePaymentConfirmationPurchase = selectedPurchase ?? paymentConfirmationPurchase;
+
+  useEffect(() => {
+    if (paymentConfirmationPurchase) {
+      setSelectedPurchase(paymentConfirmationPurchase);
+    }
+  }, [paymentConfirmationPurchase]);
 
   return (
     <PageShell
@@ -51,94 +72,150 @@ export function CheckoutPage({
     >
       {rows.map((row, index) => {
         if (row.kind === 'purchase') {
+          const price = formatPrice(row.purchase.itemName, row.purchase.price);
+
           return (
-            <div key={row.purchase.reservationId} style={purchasedCard}>
-              <p style={eyebrowSuccess}>✓ Purchased</p>
-              <div style={purchasedRow}>
-                <span style={checkBadge}>✓</span>
-                <div>
-                  <p style={itemName}>{row.purchase.itemName}</p>
-                  <p style={itemMeta}>Paid at {formatDateTime(row.purchase.purchasedAt)}</p>
+            <article key={row.purchase.reservationId} style={purchasedCard}>
+              <div style={topRow}>
+                <p style={eyebrowSuccess}>✓ Purchased</p>
+                <span style={timerPurchased}>Paid at {formatDateTime(row.purchase.purchasedAt)}</span>
+              </div>
+
+              <div style={mainRow}>
+                <div aria-hidden="true" style={imagePlaceholder}>
+                  {imageLabel(row.purchase.itemName)}
+                </div>
+                <div style={itemInfo}>
+                  <div style={namePriceRow}>
+                    <p style={itemName}>{row.purchase.itemName}</p>
+                    <p style={itemPrice}>{price}</p>
+                  </div>
                   <p style={reservationIdText}>{row.purchase.reservationId}</p>
                 </div>
               </div>
-            </div>
+
+              <div style={bottomRow}>
+                <span style={windowText}>{formatSaleWindow(salesById.get(row.purchase.saleId))}</span>
+                <button style={confirmationBtn} onClick={() => setSelectedPurchase(row.purchase)}>
+                  Show payment confirmation
+                </button>
+              </div>
+            </article>
           );
         }
 
         const item = row.item;
+        const price = formatPrice(item.itemName, item.price);
         const msRemaining = Date.parse(item.expiresAt) - now;
         const isUrgent = msRemaining > 0 && msRemaining < 60_000;
         const isBuying = isCheckingOutIds.has(item.reservationId);
         const isCancelling = isCancellingIds.has(item.reservationId);
-        const simFailure = simulateFailureIds.has(item.reservationId);
-        const error = checkoutErrors[item.reservationId];
         const activeIndex = rows.slice(0, index).filter((entry) => entry.kind === 'cart').length;
 
         return (
-          <div key={item.reservationId} style={isUrgent ? urgentCard : normalCard}>
-            <p style={isUrgent ? eyebrowUrgent : eyebrow}>
-              {isUrgent ? '⚡ Expires soonest — pay this first' : activeIndex === 0 ? 'Pay next' : 'Up next'}
-            </p>
-            <p style={cardTitle}>{item.itemName}</p>
-
-            <div style={metaRow}>
-              <span style={metaText}>{item.reservationId}</span>
+          <article key={item.reservationId} style={isUrgent ? urgentCard : normalCard}>
+            <div style={topRow}>
+              <p style={isUrgent ? eyebrowUrgent : eyebrow}>
+                {isUrgent ? '⚡ Expires soonest - pay this first' : activeIndex === 0 ? 'Pay next' : 'Up next'}
+              </p>
               <span style={isUrgent ? timerUrgent : timerNormal}>
                 {formatRemaining(item.expiresAt, now)}
               </span>
+            </div>
+
+            <div style={mainRow}>
+              <div aria-hidden="true" style={imagePlaceholder}>
+                {imageLabel(item.itemName)}
+              </div>
+              <div style={itemInfo}>
+                <div style={namePriceRow}>
+                  <p style={cardTitle}>{item.itemName}</p>
+                  <p style={itemPrice}>{price}</p>
+                </div>
+                <p style={metaText}>{item.reservationId}</p>
+              </div>
             </div>
 
             {isUrgent ? (
               <p style={urgentWarning}>⚠ Less than 1 minute — this hold will expire soon</p>
             ) : null}
 
-            <label style={simulateRow}>
-              <input
-                type="checkbox"
-                checked={simFailure}
-                onChange={() => onToggleSimulateFailure(item.reservationId)}
-                disabled={isBuying}
-              />
-              Simulate payment failure
-            </label>
-
-            {error ? <p style={itemError}>{error}</p> : null}
-
-            <button
-              style={isUrgent ? buyUrgentBtn : buyNormalBtn}
-              disabled={isBuying || isCancelling}
-              onClick={() => onBuyItem(item.reservationId)}
-            >
-              {isBuying ? 'Processing...' : `Buy ${item.itemName} →`}
-            </button>
-
-            <div style={{ marginTop: '0.45rem', textAlign: 'right' }}>
-              <button
-                style={isUrgent ? removeUrgentBtn : removeBtn}
-                disabled={isBuying || isCancelling}
-                onClick={() => onRemoveFromCart(item.reservationId)}
-              >
-                {isCancelling ? 'Removing...' : 'Remove from cart'}
-              </button>
+            <div style={bottomRow}>
+              <span style={windowText}>{formatSaleWindow(salesById.get(item.saleId))}</span>
+              <div style={actionsRow}>
+                <button
+                  style={isUrgent ? removeUrgentBtn : removeBtn}
+                  disabled={isBuying || isCancelling}
+                  onClick={() => onRemoveFromCart(item.reservationId)}
+                >
+                  {isCancelling ? 'Removing...' : 'Remove from cart'}
+                </button>
+                <button
+                  style={isUrgent ? buyUrgentBtn : buyNormalBtn}
+                  disabled={isBuying || isCancelling}
+                  onClick={() => onOpenPayment(item.reservationId)}
+                >
+                  {isBuying ? 'Processing...' : 'Pay now'}
+                </button>
+              </div>
             </div>
-          </div>
+          </article>
         );
       })}
-
-      {allDone ? (
-        <div style={allDoneCard}>
-          <button style={confirmationBtn} onClick={onViewConfirmation}>
-            View order confirmation →
-          </button>
-        </div>
-      ) : null}
 
       <div style={footerRow}>
         <button style={ghostBtn} onClick={onKeepShopping}>← Keep shopping</button>
       </div>
+
+      {activePaymentItem ? (
+        <PaymentModal
+          item={activePaymentItem}
+          shopperName={session?.displayName ?? ''}
+          now={now}
+          isSubmitting={isCheckingOutIds.has(activePaymentItem.reservationId)}
+          isSimulatingFailure={simulateFailureIds.has(activePaymentItem.reservationId)}
+          error={paymentError}
+          onToggleSimulateFailure={() => onToggleSimulateFailure(activePaymentItem.reservationId)}
+          onCancel={onClosePayment}
+          onConfirm={onConfirmPayment}
+        />
+      ) : null}
+
+      {visiblePaymentConfirmationPurchase ? (
+        <PaymentConfirmationModal
+          purchase={visiblePaymentConfirmationPurchase}
+          onClose={() => {
+            setSelectedPurchase(null);
+            onClosePaymentConfirmation();
+          }}
+        />
+      ) : null}
     </PageShell>
   );
+}
+
+function formatPrice(itemName: string, price?: number) {
+  const resolved = storefrontPrice(itemName, price);
+  return resolved === null ? 'Price unavailable' : formatUsd(resolved);
+}
+
+function imageLabel(itemName: string) {
+  return itemName
+    .split(' ')
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+}
+
+function formatSaleWindow(sale: SaleItem | undefined) {
+  if (!sale) return 'Sale window unavailable';
+  return formatWindow(sale.startsAt, sale.endsAt);
+}
+
+function formatWindow(startsAt: string, endsAt: string) {
+  const fmt = (value: string) => new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return `${fmt(startsAt)} - ${fmt(endsAt)}`;
 }
 
 function formatRemaining(expiresAt: string, now: number) {
@@ -158,10 +235,12 @@ function formatDateTime(value: string) {
 }
 
 const purchasedCard: CSSProperties = {
-  background: '#f0fdf4',
-  border: '1px solid #bbf7d0',
+  background: '#f8fafc',
+  border: '1px solid #dbe5f0',
   borderRadius: '0.875rem',
-  padding: '1rem'
+  padding: '1rem',
+  display: 'grid',
+  gap: '0.8rem'
 };
 
 const eyebrowSuccess: CSSProperties = {
@@ -169,11 +248,24 @@ const eyebrowSuccess: CSSProperties = {
   fontSize: '0.7rem',
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  color: '#166534',
+  color: '#4b5563',
   fontWeight: 700
 };
 
-const purchasedRow: CSSProperties = { display: 'flex', alignItems: 'center', gap: '0.6rem' };
+const topRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '0.75rem',
+  flexWrap: 'wrap'
+};
+
+const mainRow: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '3.25rem minmax(0, 1fr)',
+  gap: '0.8rem',
+  alignItems: 'center'
+};
 
 const checkBadge: CSSProperties = {
   width: '1.3rem',
@@ -188,8 +280,34 @@ const checkBadge: CSSProperties = {
   flexShrink: 0
 };
 
+const imagePlaceholder: CSSProperties = {
+  display: 'grid',
+  placeItems: 'center',
+  width: '3.25rem',
+  height: '3.25rem',
+  borderRadius: '0.8rem',
+  background: '#eff3f8',
+  color: '#6b7280',
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  letterSpacing: '0.08em'
+};
+
+const itemInfo: CSSProperties = {
+  display: 'grid',
+  gap: '0.2rem',
+  minWidth: 0
+};
+
+const namePriceRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '0.75rem'
+};
+
 const itemName: CSSProperties = { margin: 0, fontWeight: 700, fontSize: '0.9rem', color: '#0b192d' };
-const itemMeta: CSSProperties = { margin: '0.1rem 0 0', fontSize: '0.74rem', color: '#6b7280' };
+const itemPrice: CSSProperties = { margin: 0, color: '#095ae9', fontSize: '0.92rem', fontWeight: 700, flexShrink: 0 };
 const reservationIdText: CSSProperties = { margin: '0.1rem 0 0', fontSize: '0.74rem', color: '#6b7280' };
 
 const normalCard: CSSProperties = {
@@ -197,7 +315,9 @@ const normalCard: CSSProperties = {
   border: '1px solid #e5e7eb',
   borderRadius: '0.875rem',
   padding: '1rem',
-  boxShadow: '0 1px 6px rgba(9,90,233,0.06)'
+  boxShadow: '0 1px 6px rgba(9,90,233,0.06)',
+  display: 'grid',
+  gap: '0.8rem'
 };
 
 const urgentCard: CSSProperties = {
@@ -205,7 +325,9 @@ const urgentCard: CSSProperties = {
   border: '2px solid #c0392b',
   borderRadius: '0.875rem',
   padding: '1rem',
-  boxShadow: '0 4px 18px rgba(192,57,43,0.15)'
+  boxShadow: '0 4px 18px rgba(192,57,43,0.15)',
+  display: 'grid',
+  gap: '0.8rem'
 };
 
 const eyebrow: CSSProperties = {
@@ -223,20 +345,32 @@ const eyebrowUrgent: CSSProperties = {
 };
 
 const cardTitle: CSSProperties = {
-  margin: '0 0 0.5rem',
+  margin: 0,
   fontSize: '1rem',
   fontWeight: 700,
   color: '#0b192d'
 };
 
-const metaRow: CSSProperties = {
+const bottomRow: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  marginBottom: '0.55rem'
+  gap: '0.75rem',
+  flexWrap: 'wrap'
 };
 
-const metaText: CSSProperties = { fontSize: '0.72rem', color: '#6b7280' };
+const metaText: CSSProperties = { margin: 0, fontSize: '0.72rem', color: '#6b7280' };
+
+const windowText: CSSProperties = { fontSize: '0.78rem', color: '#4b5563' };
+
+const actionsRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.55rem',
+  marginLeft: 'auto',
+  flexWrap: 'wrap',
+  justifyContent: 'flex-end'
+};
 
 const timerNormal: CSSProperties = {
   fontSize: '0.88rem',
@@ -253,6 +387,15 @@ const timerUrgent: CSSProperties = {
   background: '#c0392b'
 };
 
+const timerPurchased: CSSProperties = {
+  fontSize: '0.74rem',
+  fontWeight: 600,
+  color: '#6b7280',
+  background: '#eef2f7',
+  padding: '0.22rem 0.65rem',
+  borderRadius: '999px'
+};
+
 const urgentWarning: CSSProperties = {
   margin: '0 0 0.6rem',
   background: 'rgba(192,57,43,0.07)',
@@ -263,25 +406,6 @@ const urgentWarning: CSSProperties = {
   color: '#c0392b'
 };
 
-const simulateRow: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  fontSize: '0.78rem',
-  color: '#6b7280',
-  marginBottom: '0.6rem'
-};
-
-const itemError: CSSProperties = {
-  margin: '0 0 0.6rem',
-  padding: '0.45rem 0.65rem',
-  borderRadius: '0.5rem',
-  background: 'rgba(192,57,43,0.08)',
-  border: '1px solid rgba(192,57,43,0.2)',
-  color: '#c0392b',
-  fontSize: '0.78rem'
-};
-
 const buyNormalBtn: CSSProperties = {
   background: '#095ae9',
   color: '#ffffff',
@@ -290,8 +414,7 @@ const buyNormalBtn: CSSProperties = {
   padding: '0.55rem 0.9rem',
   fontSize: '0.82rem',
   fontWeight: 700,
-  cursor: 'pointer',
-  width: '100%'
+  cursor: 'pointer'
 };
 
 const buyUrgentBtn: CSSProperties = {
@@ -317,24 +440,16 @@ const removeUrgentBtn: CSSProperties = {
   color: '#c0392b'
 };
 
-const allDoneCard: CSSProperties = {
-  background: '#f0fdf4',
-  border: '1px solid #bbf7d0',
-  borderRadius: '0.875rem',
-  padding: '1rem'
-};
-
 const confirmationBtn: CSSProperties = {
-  background: '#095ae9',
-  color: '#ffffff',
-  border: 'none',
+  background: '#ffffff',
+  border: '1px solid #d1d9e6',
+  color: '#374151',
   borderRadius: '0.5rem',
-  padding: '0.65rem 1rem',
-  fontSize: '0.88rem',
-  fontWeight: 700,
+  padding: '0.5rem 0.85rem',
+  fontSize: '0.8rem',
+  fontWeight: 600,
   cursor: 'pointer',
-  width: '100%',
-  textAlign: 'center'
+  marginLeft: 'auto'
 };
 
 const footerRow: CSSProperties = { display: 'flex', gap: '0.5rem' };

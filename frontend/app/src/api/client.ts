@@ -6,6 +6,7 @@ export type SessionResponse = {
 export type SaleItem = {
   saleId: string;
   itemName: string;
+  price?: number;
   status: 'upcoming' | 'active' | 'ended';
   startsAt: string;
   endsAt: string;

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { SessionResponse } from '../api/client';
 import { PageShell } from '../components/PageShell';
+import { formatUsd, storefrontPrice } from '../storefrontPricing';
 import type { Notice, PurchaseSummary } from '../types';
 
 type Props = {
@@ -15,6 +16,7 @@ export function ConfirmationPage({ session, notice, purchases, onBack }: Props) 
     <PageShell
       page="confirmation"
       title="Order confirmed"
+      description="Purchased items remain available here as a receipt view."
       session={session}
       notice={notice}
     >
@@ -27,6 +29,7 @@ export function ConfirmationPage({ session, notice, purchases, onBack }: Props) 
             <div key={purchase.reservationId} style={purchaseRow}>
               <div>
                 <p style={purchaseName}>{purchase.itemName}</p>
+                <p style={purchaseMeta}>{formatPrice(purchase)}</p>
                 <p style={purchaseMeta}>Purchased at {formatDateTime(purchase.purchasedAt)}</p>
                 <p style={purchaseMeta}>{purchase.reservationId}</p>
               </div>
@@ -52,6 +55,11 @@ function formatDateTime(value: string) {
   });
 }
 
+function formatPrice(purchase: PurchaseSummary) {
+  const price = storefrontPrice(purchase.itemName, purchase.price);
+  return price === null ? 'Price unavailable' : formatUsd(price);
+}
+
 const centerLayout: CSSProperties = { display: 'grid', justifyItems: 'center' };
 
 const receiptCard: CSSProperties = {
@@ -63,6 +71,14 @@ const receiptCard: CSSProperties = {
   background: '#ffffff',
   border: '1px solid #e5e7eb',
   boxShadow: '0 1px 6px rgba(9,90,233,0.06)'
+};
+
+const receiptTitle: CSSProperties = {
+  margin: 0,
+  fontSize: 'clamp(1.35rem, 3vw, 1.9rem)',
+  lineHeight: 1.05,
+  fontWeight: 700,
+  color: '#0b192d'
 };
 
 const successBadge: CSSProperties = {
@@ -77,14 +93,6 @@ const successBadge: CSSProperties = {
   fontWeight: 700,
   letterSpacing: '0.06em',
   textTransform: 'uppercase'
-};
-
-const receiptTitle: CSSProperties = {
-  margin: 0,
-  fontSize: 'clamp(1.35rem, 3vw, 1.9rem)',
-  lineHeight: 1.05,
-  fontWeight: 700,
-  color: '#0b192d'
 };
 
 const purchaseRow: CSSProperties = {

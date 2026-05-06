@@ -14,6 +14,7 @@ export type CartReservation = {
   reservationId: string;
   saleId: string;
   itemName: string;
+  price?: number;
   expiresAt: string;
   remainingStock?: number;
 };
@@ -22,6 +23,7 @@ export type PurchaseSummary = {
   reservationId: string;
   saleId: string;
   itemName: string;
+  price?: number;
   purchasedAt: string;
   expiresAt: string;
 };
@@ -29,8 +31,7 @@ export type PurchaseSummary = {
 export const flow: Page[] = [
   'landing',
   'product-list',
-  'checkout',
-  'confirmation'
+  'checkout'
 ];
 
 export const pageLabels: Record<Page, string> = {
@@ -38,5 +39,5 @@ export const pageLabels: Record<Page, string> = {
   'product-list': 'Products',
   'product-page': 'Product Page',
   checkout: 'Checkout',
-  confirmation: 'Confirm'
+  confirmation: 'Confirmation'
 };

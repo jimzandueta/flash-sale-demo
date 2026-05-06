@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react';
 import type { SaleItem, SessionResponse } from '../api/client';
+import { CartStatusRail } from '../components/CartStatusRail';
 import { PageShell } from '../components/PageShell';
+import { formatUsd, storefrontPrice } from '../storefrontPricing';
 import type { CartReservation, Notice } from '../types';
 
 type Props = {
@@ -29,62 +31,68 @@ export function ProductListPage({
   return (
     <PageShell
       page="product-list"
-      title="Available drops"
+      title="Products"
+      description="Limited drops with short sale windows."
       session={session}
       notice={notice}
     >
-      {cart.length > 0 ? (
-        <div style={cartBar}>
-          <span style={cartBarText}>🛒 {cart.length} {cart.length === 1 ? 'item' : 'items'} held</span>
-          <button style={cartBarBtn} onClick={onProceedToCheckout}>
-            Proceed to checkout →
-          </button>
-        </div>
-      ) : null}
+      <section style={pageLayout(cart.length > 0)}>
+        {isLoadingCatalog ? (
+          <div style={contentCard}>
+            <p style={loadingText}>Syncing the product board...</p>
+          </div>
+        ) : (
+          <div style={contentCard}>
+            <section style={productGrid}>
+              {sales.map((sale) => {
+                const cartItem = cart.find((item) => item.saleId === sale.saleId);
+                const isPurchased = purchasedSaleIds.has(sale.saleId);
+                const price = storefrontPrice(sale.itemName, sale.price);
 
-      {isLoadingCatalog ? (
-        <section style={contentCard}>
-          <p style={loadingText}>Syncing the product board...</p>
-        </section>
-      ) : (
-        <section style={productGrid}>
-          {sales.map((sale) => {
-            const cartItem = cart.find((item) => item.saleId === sale.saleId);
-            const isPurchased = purchasedSaleIds.has(sale.saleId);
+                return (
+                  <article key={sale.saleId} style={productCard(Boolean(cartItem), isPurchased, sale.status)}>
+                    <div style={cardTop}>
+                      <span style={statusPill(sale.status)}>{sale.status}</span>
+                      <span style={holdText}>{formatWindow(sale.startsAt, sale.endsAt)}</span>
+                    </div>
+                    <h2 style={cardTitle}>{sale.itemName}</h2>
+                    <p style={priceText}>{price === null ? 'Price unavailable' : formatUsd(price)}</p>
+                    <p style={windowText}>Sale window: {formatWindow(sale.startsAt, sale.endsAt)}</p>
+                    <p style={bodyText}>{productCopy(sale.itemName)}</p>
 
-            return (
-              <article key={sale.saleId} style={productCard}>
-                <div style={cardTop}>
-                  <span style={statusPill(sale.status)}>{sale.status}</span>
-                  <span style={holdText}>{sale.reservationTtlSeconds / 60} min hold</span>
-                </div>
-                <h2 style={cardTitle}>{sale.itemName}</h2>
-                <p style={skuText}>{sale.saleId}</p>
-                <p style={windowText}>{formatWindow(sale.startsAt, sale.endsAt)}</p>
+                    {isPurchased ? <p style={purchasedBanner}>✓ Already purchased</p> : null}
 
-                {isPurchased ? <p style={purchasedBanner}>✓ Already purchased</p> : null}
+                    {!isPurchased && cartItem ? (
+                      <div style={holdBanner}>
+                        <span>In cart</span>
+                        <strong>{formatRemaining(cartItem.expiresAt, now)}</strong>
+                      </div>
+                    ) : null}
 
-                {!isPurchased && cartItem ? (
-                  <div style={holdBanner}>
-                    <span>In cart</span>
-                    <strong>{formatRemaining(cartItem.expiresAt, now)}</strong>
-                  </div>
-                ) : null}
+                    <button style={secondaryButton} onClick={() => onViewProduct(sale.saleId)}>
+                      View product
+                    </button>
+                  </article>
+                );
+              })}
+            </section>
+          </div>
+        )}
 
-                {isPurchased ? (
-                  <button style={disabledButton} disabled>Already purchased</button>
-                ) : (
-                  <button style={secondaryButton} onClick={() => onViewProduct(sale.saleId)}>
-                    View product
-                  </button>
-                )}
-              </article>
-            );
-          })}
-        </section>
-      )}
+        {cart.length > 0 ? (
+          <CartStatusRail cart={cart} now={now} onProceedToCheckout={onProceedToCheckout} />
+        ) : null}
+      </section>
     </PageShell>
   );
+}
+
+function productCopy(itemName: string) {
+  if (itemName === 'Bookipi Cap') return 'Embroidered cap in the current drop.';
+  if (itemName === 'Founder Tee') return 'Heavyweight tee from the founder collection.';
+  if (itemName === 'Bookipi Tote') return 'Everyday canvas tote with limited stock.';
+  if (itemName === 'Bookipi Hoodie') return 'Midweight fleece hoodie in the next release.';
+  return 'Limited-run item from the flash sale.';
 }
 
 function formatRemaining(expiresAt: string, now: number) {
@@ -123,28 +131,12 @@ const baseChip: CSSProperties = {
   textTransform: 'uppercase'
 };
 
-const cartBar: CSSProperties = {
-  background: '#e0f0ff',
-  border: '1px solid rgba(9,90,233,0.18)',
-  borderRadius: '0.6rem',
-  padding: '0.6rem 0.9rem',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: '1rem'
-};
-
-const cartBarText: CSSProperties = { fontSize: '0.85rem', fontWeight: 600, color: '#095ae9' };
-
-const cartBarBtn: CSSProperties = {
-  border: 'none',
-  borderRadius: '0.4rem',
-  padding: '0.35rem 0.75rem',
-  fontSize: '0.8rem',
-  fontWeight: 700,
-  cursor: 'pointer',
-  background: '#095ae9',
-  color: '#ffffff'
+function pageLayout(hasCart: boolean): CSSProperties {
+  return {
+    display: 'grid',
+    gap: '0.8rem',
+    gridTemplateColumns: hasCart ? 'repeat(auto-fit, minmax(280px, 1fr))' : 'minmax(0, 1fr)'
+  };
 };
 
 const contentCard: CSSProperties = {
@@ -165,15 +157,12 @@ const productGrid: CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))'
 };
 
-const productCard: CSSProperties = {
-  display: 'grid',
-  gap: '0.55rem',
-  padding: '0.75rem',
-  borderRadius: '0.75rem',
-  background: '#ffffff',
-  border: '1px solid #e5e7eb',
-  boxShadow: '0 1px 6px rgba(9,90,233,0.06)'
-};
+function productCard(isHeld: boolean, isPurchased: boolean, status: SaleItem['status']): CSSProperties {
+  if (isPurchased) return purchasedCard;
+  if (isHeld) return heldCard;
+  if (status !== 'active') return subduedCard;
+  return defaultCard;
+}
 
 const cardTop: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' };
 
@@ -184,9 +173,10 @@ const cardTitle: CSSProperties = {
   color: '#0b192d'
 };
 
-const skuText: CSSProperties = { margin: 0, color: '#6b7280', fontSize: '0.76rem' };
+const priceText: CSSProperties = { margin: 0, color: '#095ae9', fontSize: '0.92rem', fontWeight: 700 };
 const windowText: CSSProperties = { margin: 0, fontWeight: 600, color: '#6b7280', fontSize: '0.76rem' };
 const holdText: CSSProperties = { fontSize: '0.65rem', color: '#6b7280' };
+const bodyText: CSSProperties = { margin: 0, color: '#374151', fontSize: '0.82rem', lineHeight: 1.5 };
 
 const holdBanner: CSSProperties = {
   margin: 0,
@@ -213,6 +203,7 @@ const secondaryButton: CSSProperties = {
   border: '1px solid #e5e7eb',
   borderRadius: '0.4rem',
   padding: '0.3rem 0.6rem',
+  marginTop: 'auto',
   fontWeight: 600,
   fontSize: '0.75rem',
   cursor: 'pointer',
@@ -221,14 +212,32 @@ const secondaryButton: CSSProperties = {
   width: '100%'
 };
 
-const disabledButton: CSSProperties = {
-  border: 'none',
-  borderRadius: '0.4rem',
-  padding: '0.3rem 0.6rem',
-  fontWeight: 600,
-  fontSize: '0.75rem',
-  cursor: 'default',
-  background: '#f3f4f6',
-  color: '#9ca3af',
-  width: '100%'
+const defaultCard: CSSProperties = {
+  display: 'grid',
+  gap: '0.55rem',
+  height: '100%',
+  padding: '0.9rem',
+  borderRadius: '0.75rem',
+  background: '#ffffff',
+  border: '1px solid #e5e7eb',
+  boxShadow: '0 1px 6px rgba(9,90,233,0.06)'
+};
+
+const heldCard: CSSProperties = {
+  ...defaultCard,
+  border: '1px solid rgba(9,90,233,0.3)',
+  background: '#f8fbff',
+  boxShadow: '0 8px 18px rgba(9,90,233,0.12)'
+};
+
+const subduedCard: CSSProperties = {
+  ...defaultCard,
+  background: '#f9fafb',
+  border: '1px solid #e5e7eb',
+  boxShadow: 'none'
+};
+
+const purchasedCard: CSSProperties = {
+  ...defaultCard,
+  background: '#f8fbff'
 };
