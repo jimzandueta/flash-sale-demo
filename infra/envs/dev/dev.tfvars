@@ -1,7 +1,7 @@
 aws_region                      = "us-east-1"
 project_name                    = "flash-sale-platform"
 environment                     = "dev"
-default_reservation_ttl_seconds = 300
+default_reservation_ttl_seconds = 180
 vpc_id                          = "vpc-0123456789abcdef0"
 lambda_subnet_ids               = ["subnet-0123456789abcdef0", "subnet-1234567890abcdef0"]
 lambda_security_group_ids       = ["sg-0123456789abcdef0"]
