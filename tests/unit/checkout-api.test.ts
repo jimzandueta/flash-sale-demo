@@ -14,14 +14,19 @@ describe('checkout handler', () => {
 
   it('publishes PurchaseCompleted only when Redis returns PURCHASED', async () => {
     const redis = {
-      eval: vi.fn().mockResolvedValue(['PURCHASED', '2026-05-06T10:02:10.000Z'])
+      eval: vi.fn().mockResolvedValue([
+        'PURCHASED',
+        '2026-05-06T10:02:10.000Z',
+        'sale_sneaker_001'
+      ])
     };
 
     const result = await checkoutReservation(redis as Pick<Redis, 'eval'>, {
       reservationId: 'res_456',
       userToken: 'usr_tok_1',
       simulateFailure: false,
-      now: '2026-05-06T10:02:10.000Z'
+      now: '2026-05-06T10:02:10.000Z',
+      idempotencyKey: 'idem_checkout_1'
     });
 
     expect(result).toEqual({
@@ -31,10 +36,37 @@ describe('checkout handler', () => {
     });
     expect(publishEvent).toHaveBeenCalledWith(
       'purchase-completed',
-      expect.objectContaining({
+      {
+        eventId: 'idem_checkout_1',
+        occurredAt: '2026-05-06T10:02:10.000Z',
         reservationId: 'res_456',
+        saleId: 'sale_sneaker_001',
         userToken: 'usr_tok_1',
-        status: 'PURCHASED',
+        purchasedAt: '2026-05-06T10:02:10.000Z'
+      }
+    );
+  });
+
+  it('falls back to reservationId for purchase eventId when idempotencyKey is absent', async () => {
+    const redis = {
+      eval: vi.fn().mockResolvedValue(['PURCHASED', '2026-05-06T10:02:10.000Z', 'sale_sneaker_001'])
+    };
+
+    await checkoutReservation(redis as Pick<Redis, 'eval'>, {
+      reservationId: 'res_456',
+      userToken: 'usr_tok_1',
+      simulateFailure: false,
+      now: '2026-05-06T10:02:10.000Z'
+    });
+
+    expect(publishEvent).toHaveBeenCalledWith(
+      'purchase-completed',
+      expect.objectContaining({
+        eventId: 'res_456',
+        occurredAt: '2026-05-06T10:02:10.000Z',
+        reservationId: 'res_456',
+        saleId: 'sale_sneaker_001',
+        userToken: 'usr_tok_1',
         purchasedAt: '2026-05-06T10:02:10.000Z'
       })
     );

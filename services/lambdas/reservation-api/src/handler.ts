@@ -20,6 +20,7 @@ export async function reserveSale(
   if (result.status === 'RESERVED' && result.shouldPublishEvent !== false) {
     await publishEvent('reservation-created', {
       eventId: input.idempotencyKey ?? result.reservationId,
+      occurredAt: input.now,
       reservationId: result.reservationId,
       saleId: input.saleId,
       userToken: input.userToken,

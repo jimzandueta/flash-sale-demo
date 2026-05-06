@@ -49,4 +49,4 @@ redis.call('DEL', 'sale:' .. saleId .. ':user:' .. userToken)
 redis.call('SREM', 'user:' .. userToken .. ':reservations', reservationId)
 redis.call('ZREM', 'sale:' .. saleId .. ':expiries', reservationId)
 
-return { 'PURCHASED', purchasedAt }
+return { 'PURCHASED', purchasedAt, saleId }

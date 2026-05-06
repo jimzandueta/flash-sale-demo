@@ -15,6 +15,7 @@ export async function checkoutReservation(
     userToken: string;
     simulateFailure: boolean;
     now?: string;
+    idempotencyKey?: string;
   }
 ) {
   const nowIso = input.now ?? new Date().toISOString();
@@ -44,9 +45,11 @@ export async function checkoutReservation(
   }
 
   await publishEvent('purchase-completed', {
+    eventId: input.idempotencyKey ?? input.reservationId,
+    occurredAt: result[1],
     reservationId: input.reservationId,
+    saleId: result[2],
     userToken: input.userToken,
-    status: 'PURCHASED',
     purchasedAt: result[1]
   });
 

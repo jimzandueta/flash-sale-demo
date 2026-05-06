@@ -35,4 +35,4 @@ redis.call('SREM', 'user:' .. userToken .. ':reservations', reservationId)
 redis.call('ZREM', expiriesKey, reservationId)
 redis.call('HSET', reservationKey, 'status', 'EXPIRED')
 
-return { 'RELEASED' }
+return { 'RELEASED', saleId, userToken, tostring(expiresAt) }

@@ -1,6 +1,6 @@
 # Flash Sale Platform
 
-Flash Sale Platform is a thin React storefront backed by Fastify handlers, Redis reservation state, DynamoDB persistence hooks, and queue-driven reconciliation workers. The local flow mirrors the implemented product journey: landing, product list, product page, checkout with inline purchase receipts, and final order confirmation.
+Flash Sale Platform is a thin React storefront backed by Fastify handlers, Redis reservation state, a DynamoDB-backed durable reservation ledger, and queue-driven workers. The local flow mirrors the implemented product journey: landing, product list, product page, checkout with inline purchase receipts, and final order confirmation.
 
 ## Run locally
 
@@ -20,6 +20,6 @@ Host ports can be overridden in `.env.example` through `REDIS_HOST_PORT`, `DYNAM
 - React + Vite SPA for the local storefront flow.
 - Fastify local API wiring session, sales, reservation, reservation read, and checkout handlers.
 - Redis-backed reservation engine for live stock allocation and idempotent holds.
-- DynamoDB reservation ledger hooks plus queue-backed worker and expiry sweeper stubs.
+- DynamoDB-backed durable reservation ledger plus SQS-driven local worker processing for reservation, purchase, and expiry events.
 - Docker Compose + LocalStack for local infrastructure parity.
 - Terraform dev environment under `infra/envs/dev` for AWS infrastructure provisioning.

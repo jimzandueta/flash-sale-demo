@@ -90,7 +90,10 @@ export async function buildServer() {
 
   app.post('/reservations/:reservationId/checkout', async (request, reply) => {
     const params = request.params as { reservationId: string };
-    const headers = request.headers as { 'x-user-token'?: string };
+    const headers = request.headers as {
+      'x-user-token'?: string;
+      'idempotency-key'?: string;
+    };
     const body = (request.body ?? {}) as { simulateFailure?: boolean };
     const userToken = getUserToken(headers);
 
@@ -101,7 +104,8 @@ export async function buildServer() {
     return checkoutReservation(redis, {
       reservationId: params.reservationId,
       userToken,
-      simulateFailure: body.simulateFailure ?? false
+      simulateFailure: body.simulateFailure ?? false,
+      idempotencyKey: headers['idempotency-key']
     });
   });
 

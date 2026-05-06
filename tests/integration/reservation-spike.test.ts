@@ -7,6 +7,9 @@ describe('reservation spike endpoint', () => {
 
   beforeEach(async () => {
     process.env.REDIS_URL ??= 'redis://127.0.0.1:6379';
+    delete process.env.SQS_ENDPOINT;
+    delete process.env.AWS_ACCESS_KEY_ID;
+    delete process.env.AWS_SECRET_ACCESS_KEY;
     redis = new Redis(process.env.REDIS_URL);
     await redis.flushdb();
   });
