@@ -417,6 +417,12 @@ resource "aws_apigatewayv2_route" "get_reservation_by_id" {
   target    = "integrations/${aws_apigatewayv2_integration.reservation_api.id}"
 }
 
+resource "aws_apigatewayv2_route" "delete_reservation" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "DELETE /reservations/{reservationId}"
+  target    = "integrations/${aws_apigatewayv2_integration.reservation_api.id}"
+}
+
 resource "aws_apigatewayv2_route" "post_checkout" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "POST /reservations/{reservationId}/checkout"

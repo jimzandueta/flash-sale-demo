@@ -15,7 +15,7 @@ variable "environment" {
 
 variable "default_reservation_ttl_seconds" {
   type    = number
-  default = 300
+  default = 180
 }
 
 variable "vpc_id" {
