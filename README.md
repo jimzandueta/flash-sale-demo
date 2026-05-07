@@ -15,6 +15,8 @@ docker compose up --build
 
 That's it. You can create a session, browse sales, click "Reserve Now", and get immediate feedback whether you got it or not.
 
+![Flash Sale Platform](docs/screenshot.png)
+
 ## What It Does
 
 - **Time-based sales**: Sales have start/end times and automatically transition from "upcoming" to "active" to "ended"
@@ -23,6 +25,8 @@ That's it. You can create a session, browse sales, click "Reserve Now", and get 
 - **Handles the load**: Thousands of people clicking at the same time don't bring it down
 
 ## How It Works
+
+![System Overview](docs/system-overview.png)
 
 Here's what actually happens in the system:
 
@@ -47,6 +51,7 @@ GET /sales
 The API returns all sales. For each sale, the API also checks Redis to get the current stock level, so users see real-time availability.
 
 The response looks like:
+
 ```json
 [
   {
@@ -62,9 +67,12 @@ The response looks like:
 
 ### 3. Click "Reserve Now" (The Critical Path)
 
+![Reservation Flow](docs/reservation-flow.png)
+
 This is where everything comes together. When the user clicks Reserve:
 
 **Frontend sends:**
+
 ```
 POST /sales/sale_sneaker_001/reservations
 x-user-token: usr_abc123
@@ -88,6 +96,7 @@ idempotency-key: usr_abc123-sale_sneaker_001
 
 3. **Publish to SQS**
    - Send a message to the `reservation-events` queue:
+
    ```json
    {
      "eventType": "reservation-created",
@@ -99,6 +108,7 @@ idempotency-key: usr_abc123-sale_sneaker_001
      "occurredAt": "2026-05-06T10:30:00Z"
    }
    ```
+
    - The API publishes to SQS and immediately returns to the user - doesn't wait for processing
 
 4. **Return to user**
@@ -149,6 +159,7 @@ x-user-token: usr_abc123
 ```
 
 Backend:
+
 1. **Verify in Redis** - check reservation exists and belongs to user
 2. **Convert to purchase** - run checkout Lua script (atomically marks as purchased, releases no stock)
 3. **Publish to SQS** - send `purchase-completed` event
@@ -253,6 +264,7 @@ React SPA with Vite was the fastest way to build a working demo - minimal setup,
 ## The Code
 
 The implementation lives in a few places:
+
 - `frontend/app/` - React UI
 - `services/lambdas/` - All the backend logic (session, sales, reservation, checkout, worker, expiry-sweeper)
 - `services/lambdas/shared/` - Common code that everything uses (Redis client, DynamoDB client, etc.)
@@ -266,7 +278,13 @@ I wrote tests at three levels:
 
 **Integration tests** - Full flows. Create session → reserve → checkout → confirm. Also testing the edge cases like double-reserve, race conditions, expiry.
 
-**Stress tests** - Using k6 to hammer it with 200 concurrent users. The test creates a sale with 10 items and verifies that we get exactly 10 successful reservations, no overselling, and no crashes.
+**Stress tests** - I kept the stress test focused on reservation creation because that is the hottest part of the system. `k6` sends 200 concurrent users to `POST /sales/sale_sneaker_001/reservations` for 30 seconds. Each virtual user gets its own `x-user-token` and its own unique request key.
+
+This does not try to simulate the full frontend journey. It is meant to put pressure on the part that matters most for correctness: the Redis Lua script that checks stock, prevents oversell, and enforces one reservation per user. The request also publishes to SQS, so the event path is still exercised during the run.
+
+After the load finishes, I run a separate verifier. That verifier checks Redis, DynamoDB, and SQS directly. It verifies that stock accounting still makes sense, durable reservation records do not exceed initial stock, and the reservation, purchase, and expiry queues are drained.
+
+So the stress flow is two steps: run the load, then verify the resulting system state. That gives a better signal than only checking whether the API returned `200` or `409`.
 
 ## Running It Locally
 
@@ -285,9 +303,14 @@ npm run test:ui
 
 # Run the k6 stress test (need the API running first)
 npm run stress
+
+# Verify Redis, DynamoDB, and SQS state after the run
+npm run stress:verify
 ```
 
 ## Deploying to AWS
+
+![AWS Architecture](docs/aws-arch-simplified.png)
 
 ```bash
 cd infra/envs/dev
@@ -296,12 +319,4 @@ terraform plan -var-file=dev.tfvars
 terraform apply -var-file=dev.tfvars
 ```
 
-This creates the full stack - API Gateway, Lambdas, ElastiCache, DynamoDB, SQS, CloudFront.
-
-## What I Learned
-
-For high-concurrency scenarios, atomicity matters at every step. Database transactions aren't enough - you need either atomic operations (like Redis Lua) or explicit idempotency handling.
-
-Also, separating the hot path (reserve immediately) from the slow path (process events) makes a huge difference. The user gets instant feedback, and the system can handle load spikes without falling over.
-
-Finally, having a durable record (DynamoDB) on top of a fast cache (Redis) gives you the best of both worlds - speed for the happy path, safety for when things go wrong.
+This creates the full stack: API Gateway, Lambdas, ElastiCache, DynamoDB, SQS, CloudFront.

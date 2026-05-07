@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.base.json --noEmit",
     "dev:api": "tsx watch services/lambdas/local-api/src/server.ts",
     "dev:worker": "tsx watch services/lambdas/reservation-worker/src/worker.ts",
-    "stress": "k6 run tests/stress/reservation-spike.js"
+    "stress": "k6 run tests/stress/reservation-spike.js",
+    "stress:verify": "tsx tests/stress/verify-stress-run.ts"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",
